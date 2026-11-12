@@ -1,5 +1,6 @@
 package com.winlator.container;
 
+import app.gamenative.BuildConfig;
 import android.os.Environment;
 import android.util.Log;
 
@@ -63,15 +64,17 @@ public class Container {
     public static final Set<String> REDIST_WINCOMPONENTS = Collections.unmodifiableSet(new LinkedHashSet<>(Arrays.asList(
             "vcrun2005", "vcrun2008", "vcrun2012", "vcrun2013", "vcrun2022", "xaudio", "physx")));
     public static final String FALLBACK_WINCOMPONENTS = "direct3d=1,directsound=1,directinput8=0,directinput=0,directmusic=1,directshow=1,directplay=1,vcrun2010=1,wmdecoder=1,opengl=0";
+    // Private data dir of this build (follows applicationId, e.g. a renamed fork build).
+    public static final String APP_DATA_DIR = "/data/data/" + BuildConfig.APPLICATION_ID;
     public static final String[] MEDIACONV_ENV_VARS = {
-            "MEDIACONV_AUDIO_DUMP_FILE=/data/data/app.gamenative/files/imagefs/home/xuser/audio.dmp",
-            "MEDIACONV_VIDEO_DUMP_FILE=/data/data/app.gamenative/files/imagefs/home/xuser/video.dmp",
-            "MEDIACONV_VIDEO_TRANSCODED_FILE=/data/data/app.gamenative/files/imagefs/home/xuser/transcoded.mkv",
-            "MEDIACONV_AUDIO_TRANSCODED_FILE=/data/data/app.gamenative/files/imagefs/home/xuser/transcoded.wav",
-            "MEDIACONV_BLANK_AUDIO_FILE=/data/data/app.gamenative/files/imagefs/home/xuser/blank.wav",
-            "MEDIACONV_BLANK_VIDEO_FILE=/data/data/app.gamenative/files/imagefs/home/xuser/blank.mkv",
+            "MEDIACONV_AUDIO_DUMP_FILE=" + APP_DATA_DIR + "/files/imagefs/home/xuser/audio.dmp",
+            "MEDIACONV_VIDEO_DUMP_FILE=" + APP_DATA_DIR + "/files/imagefs/home/xuser/video.dmp",
+            "MEDIACONV_VIDEO_TRANSCODED_FILE=" + APP_DATA_DIR + "/files/imagefs/home/xuser/transcoded.mkv",
+            "MEDIACONV_AUDIO_TRANSCODED_FILE=" + APP_DATA_DIR + "/files/imagefs/home/xuser/transcoded.wav",
+            "MEDIACONV_BLANK_AUDIO_FILE=" + APP_DATA_DIR + "/files/imagefs/home/xuser/blank.wav",
+            "MEDIACONV_BLANK_VIDEO_FILE=" + APP_DATA_DIR + "/files/imagefs/home/xuser/blank.mkv",
     };
-    public static final String DEFAULT_DRIVES = "D:"+Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)+"E:/data/data/app.gamenative/storage";
+    public static final String DEFAULT_DRIVES = "D:"+Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)+"E:" + APP_DATA_DIR + "/storage";
     public static final String DEFAULT_VARIANT = DefaultVersion.VARIANT;
     public static final String DEFAULT_WINE_VERSION = DefaultVersion.WINE_VERSION;
     public static final byte STARTUP_SELECTION_NORMAL = 0;

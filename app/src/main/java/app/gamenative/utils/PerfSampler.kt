@@ -1,5 +1,6 @@
 package app.gamenative.utils
 
+import app.gamenative.BuildConfig
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
@@ -1104,7 +1105,7 @@ object PerfSampler {
             return (
                 entries.firstOrNull { it.first == "A" }
                     ?: entries.firstOrNull { (_, path) ->
-                        !path.endsWith("/Download") && !path.endsWith("app.gamenative/storage")
+                        !path.endsWith("/Download") && !path.endsWith("${BuildConfig.APPLICATION_ID}/storage")
                     }
                 )?.second
         }
