@@ -65,8 +65,15 @@ android {
         buildConfigField("boolean", "XR_BUILD", "false")
         buildConfigField("boolean", "MODERN_XR", "false")
 
+        // GameNative S23 versioning: upstream's version stays as the base and the
+        // fork adds its own patch number, bumped with every change on avien
+        // (1.4.0-s23.1, 1.4.0-s23.2, ...). versionCode stays upstream's because the
+        // GameNative servers receive it (best-config, update check); Android still
+        // installs a build with an equal versionCode as an in-place update.
+        val upstreamVersionName = "1.4.0"
+        val s23Patch = 1
         versionCode = 24
-        versionName = "1.4.0"
+        versionName = "$upstreamVersionName-s23.$s23Patch"
 
         buildConfigField("boolean", "GOLD", "false")
         fun secret(name: String) =

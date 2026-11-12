@@ -102,22 +102,33 @@ jobs:
           --output=s23.apks --mode=universal \
           --ks="$HOME/.android/debug.keystore" --ks-pass=pass:android \
           --ks-key-alias=androiddebugkey --key-pass=pass:android
-        unzip -p s23.apks universal.apk > "GameNative-S23-${GITHUB_RUN_NUMBER}.apk"
+        unzip -p s23.apks universal.apk > universal.apk
+        VERSION=$("$ANDROID_HOME/build-tools/34.0.0/aapt2" dump badging universal.apk \
+          | sed -n "s/.*versionName='\([^']*\)'.*/\1/p" | head -n1)
+        test -n "$VERSION"
+        echo "S23_VERSION=$VERSION" >> "$GITHUB_ENV"
+        mv universal.apk "GameNative-S23-${VERSION}.apk"
         ls -lh GameNative-S23-*.apk
 
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
-        name: GameNative-S23-${{ github.run_number }}
+        name: GameNative-S23-${{ env.S23_VERSION }}
         path: GameNative-S23-*.apk
 
     - name: Publish release
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        gh release create "s23-${GITHUB_RUN_NUMBER}" "GameNative-S23-${GITHUB_RUN_NUMBER}.apk" \
+        # One release per fork version; a rebuild of the same version gets the
+        # run number appended so the tag stays unique.
+        TAG="v${S23_VERSION}"
+        if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+          TAG="${TAG}+${GITHUB_RUN_NUMBER}"
+        fi
+        gh release create "$TAG" "GameNative-S23-${S23_VERSION}.apk" \
           --repo "$GITHUB_REPOSITORY" \
           --target "$GITHUB_SHA" \
-          --title "GameNative S23 #${GITHUB_RUN_NUMBER}" \
-          --notes "Build from ${GITHUB_SHA::7} on branch ${GITHUB_REF_NAME}." \
+          --title "GameNative S23 ${S23_VERSION}" \
+          --notes "Build #${GITHUB_RUN_NUMBER} from ${GITHUB_SHA::7} on branch ${GITHUB_REF_NAME}." \
           --latest
