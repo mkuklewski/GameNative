@@ -1,0 +1,125 @@
+name: GameNative S23 build
+
+# Personal fork build (app.gamenative.avien, "GameNative S23").
+# Builds the standard (legacy) universal APK, signs it with the key from the
+# AVIEN_KEYSTORE secret and publishes it as the latest GitHub release so it can be
+# downloaded straight from the phone: https://github.com/<owner>/<repo>/releases/latest
+
+on:
+  push:
+    branches: [ "avien" ]
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+
+concurrency:
+  group: avien-s23-build
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+
+    steps:
+    - name: Check signing key
+      env:
+        AVIEN_KEYSTORE: ${{ secrets.AVIEN_KEYSTORE }}
+      run: |
+        if [ -z "$AVIEN_KEYSTORE" ]; then
+          echo "::error::Add the AVIEN_KEYSTORE repository secret (Settings > Secrets and variables > Actions)."
+          exit 1
+        fi
+
+    - name: Free disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/share/swift
+        df -h /
+
+    - name: Add swap
+      run: |
+        sudo fallocate -l 8G /mnt/swapfile.ci
+        sudo chmod 600 /mnt/swapfile.ci
+        sudo mkswap /mnt/swapfile.ci
+        sudo swapon /mnt/swapfile.ci
+        free -m
+
+    - uses: actions/checkout@v4
+
+    - name: Set up Java 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Validate Gradle wrapper
+      uses: gradle/actions/wrapper-validation@v4
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+
+    # The release build type signs with the "debug" signing config, which reads
+    # ~/.android/debug.keystore (alias androiddebugkey, passwords "android").
+    # Using our own stable key there makes every build an in-place update.
+    - name: Install signing key
+      env:
+        AVIEN_KEYSTORE: ${{ secrets.AVIEN_KEYSTORE }}
+      run: |
+        mkdir -p ~/.android
+        echo "$AVIEN_KEYSTORE" | base64 --decode > ~/.android/debug.keystore
+        keytool -list -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey > /dev/null
+
+    - name: Dummy credentials
+      run: |
+        cat <<EOF > local.properties
+        POSTHOG_API_KEY=dummy
+        POSTHOG_HOST=https://us.i.posthog.com
+        EOF
+
+    - name: Install Android SDK Build Tools
+      run: |
+        SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+        if [ ! -x "$SDKMANAGER" ]; then
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+        fi
+        yes | "$SDKMANAGER" --install "build-tools;34.0.0"
+
+    - name: Build bundle
+      run: ./gradlew -Pkotlin.daemon.jvmargs=-Xmx4g :app:bundleLegacyRelease
+
+    - name: Stop Gradle daemons
+      run: |
+        ./gradlew --stop
+        df -h /
+        free -m
+
+    # A universal APK from the bundle also contains the dynamic feature modules.
+    - name: Extract signed universal APK
+      run: |
+        java -Xmx3g -jar tools/bundletool-all-1.17.2.jar build-apks \
+          --bundle=app/build/outputs/bundle/legacyRelease/app-legacy-release.aab \
+          --output=s23.apks --mode=universal \
+          --ks="$HOME/.android/debug.keystore" --ks-pass=pass:android \
+          --ks-key-alias=androiddebugkey --key-pass=pass:android
+        unzip -p s23.apks universal.apk > "GameNative-S23-${GITHUB_RUN_NUMBER}.apk"
+        ls -lh GameNative-S23-*.apk
+
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: GameNative-S23-${{ github.run_number }}
+        path: GameNative-S23-*.apk
+
+    - name: Publish release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh release create "s23-${GITHUB_RUN_NUMBER}" "GameNative-S23-${GITHUB_RUN_NUMBER}.apk" \
+          --repo "$GITHUB_REPOSITORY" \
+          --target "$GITHUB_SHA" \
+          --title "GameNative S23 #${GITHUB_RUN_NUMBER}" \
+          --notes "Build from ${GITHUB_SHA::7} on branch ${GITHUB_REF_NAME}." \
+          --latest

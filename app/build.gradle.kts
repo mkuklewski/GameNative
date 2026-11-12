@@ -56,7 +56,8 @@ android {
     }
 
     defaultConfig {
-        applicationId = "app.gamenative"
+        // Personal fork build: installs side by side with the official app.
+        applicationId = "app.gamenative.avien"
 
         minSdk = 26
 
