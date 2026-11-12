@@ -1399,6 +1399,11 @@ fun XServerScreen(
                 if (newValue) {
                     ui.xServerView?.renderer?.setCursorVisible(false)
                 } else {
+                    // Re-sync touchscreen mode and gestures with the container
+                    PluviaApp.touchpadView?.setTouchscreenMode(container.isTouchscreenMode)
+                    if (container.isTouchscreenMode) {
+                        PluviaApp.touchpadView?.setGestureConfig(ui.currentGestureConfig)
+                    }
                     applyMouseCursorVisibility()
                 }
                 true
@@ -2451,7 +2456,11 @@ fun XServerScreen(
                             handler.setVibrationIntensity(container.getExtra("vibrationIntensity", "100").toIntOrNull() ?: 100)
                             if (container.isDisableMouseInput()) {
                                 PluviaApp.touchpadView?.setTouchscreenMouseDisabled(true)
-                            } else if (container.isTouchscreenMode()) {
+                            }
+                            // Apply touchscreen mode even when mouse input starts disabled, so
+                            // turning mouse input back on in the quick menu brings the gestures
+                            // with it instead of leaving the view in touchpad mode.
+                            if (container.isTouchscreenMode()) {
                                 PluviaApp.touchpadView?.setTouchscreenMode(true)
                                 // Apply per-game gesture configuration
                                 val gestureConfig = app.gamenative.data.TouchGestureConfig.fromJson(container.getGestureConfig())
@@ -3369,6 +3378,9 @@ fun XServerScreen(
                 container.setGestureConfig(newConfig.toJson())
                 container.saveData()
                 PluviaApp.touchpadView?.setGestureConfig(newConfig)
+                // The gesture settings are only reachable with touchscreen mode on, so
+                // make sure the touch view is really in that mode once they are saved.
+                PluviaApp.touchpadView?.setTouchscreenMode(ui.isTouchscreenModeActive)
                 applyMouseCursorVisibility()
                 ui.showTouchGestureDialog = false
             },

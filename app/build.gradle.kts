@@ -75,7 +75,7 @@ android {
         // GameNative servers receive it (best-config, update check); Android still
         // installs a build with an equal versionCode as an in-place update.
         val upstreamVersionName = "1.4.0"
-        val s23Patch = 1
+        val s23Patch = 2
         versionCode = 24
         versionName = "$upstreamVersionName-s23.$s23Patch"
 
