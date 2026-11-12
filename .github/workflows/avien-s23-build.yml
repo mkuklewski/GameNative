@@ -8,8 +8,6 @@ name: GameNative S23 build
 on:
   push:
     branches: [ "avien" ]
-    paths-ignore:
-      - '**.md'
   workflow_dispatch:
 
 concurrency:
