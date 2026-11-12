@@ -936,7 +936,7 @@
     <string name="gesture_show_cursor_touchscreen_mode">Pokaż kursor w trybie ekranu dotykowego</string>
     <string name="gesture_show_cursor_touchscreen_mode_subtitle">Utrzymuj widoczny kursor myszy, gdy gesty dotykowe są aktywne</string>
     <string name="gesture_stylus_as_finger">Rysik jak palec</string>
-    <string name="gesture_stylus_as_finger_subtitle">Dotyk rysikiem używa gestów palca zamiast działać jak mysz. Zawieszenie rysika nadal przesuwa kursor; przycisk boczny + dotyk to prawy klik</string>
+    <string name="gesture_stylus_as_finger_subtitle">Dotyk rysikiem używa gestów palca zamiast działać jak mysz. Zawieszenie rysika nadal przesuwa kursor; przycisk boczny + stuknięcie to prawy klik, przycisk boczny + przeciągnięcie to zaznaczanie ramką</string>
 
     <!-- Shooter Mode -->
     <string name="shooter_mode_settings">Ustawienia dynamicznych joysticków</string>

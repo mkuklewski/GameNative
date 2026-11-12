@@ -98,6 +98,11 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
     // "Stylus as finger": true while the current stylus stroke started with the side
     // button held, so it keeps the native stylus right-click instead of finger gestures.
     private boolean stylusStrokeUsesMouse;
+    // "Stylus as finger": stroke with the side button (or eraser end) held.
+    // Drag = left-button box selection, tap = right click.
+    private boolean stylusButtonStroke;
+    private boolean stylusButtonDragging;
+    private float stylusDownX, stylusDownY;
 
     // Long-press detection
     private Runnable longPressRunnable;
@@ -388,6 +393,9 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
             if (shouldRouteStylusAsFinger(event)) {
                 return handleTouchscreenEvent(event);
             }
+            if (stylusButtonStroke) {
+                return handleStylusButtonStroke(event);
+            }
             return handleStylusEvent(event);
         } else if (isTouchscreenMode) {
             return handleTouchscreenEvent(event);
@@ -457,12 +465,74 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
     private boolean shouldRouteStylusAsFinger(MotionEvent event) {
         if (!isTouchscreenMode || !gestureConfig.getStylusAsFinger()) {
             stylusStrokeUsesMouse = false;
+            stylusButtonStroke = false;
             return false;
         }
-        if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
+            stylusDownX = event.getX();
+            stylusDownY = event.getY();
+            stylusButtonDragging = false;
             stylusStrokeUsesMouse = isStylusButtonPressed(event);
+            stylusButtonStroke = stylusStrokeUsesMouse;
+        } else if (action == MotionEvent.ACTION_MOVE && !stylusStrokeUsesMouse
+                && isStylusButtonPressed(event)
+                && Math.hypot(event.getX() - stylusDownX, event.getY() - stylusDownY) <= LONG_PRESS_MOVE_TOLERANCE) {
+            // Side button pressed just after the pen touched down, before it moved:
+            // hand the stroke over from the finger gestures to the button stroke.
+            MotionEvent cancel = MotionEvent.obtain(event);
+            cancel.setAction(MotionEvent.ACTION_CANCEL);
+            handleTouchscreenEvent(cancel);
+            cancel.recycle();
+            stylusStrokeUsesMouse = true;
+            stylusButtonStroke = true;
         }
         return !stylusStrokeUsesMouse;
+    }
+
+    /**
+     * "Stylus as finger" stroke started with the side button (or eraser end) held:
+     * dragging draws a left-button box selection from the touch-down point, a tap
+     * without dragging is a right click.
+     */
+    private boolean handleStylusButtonStroke(MotionEvent event) {
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                handleStylusMove(event);
+                break;
+            case MotionEvent.ACTION_MOVE:
+                if (!stylusButtonDragging) {
+                    float travel = (float) Math.hypot(event.getX() - stylusDownX, event.getY() - stylusDownY);
+                    if (travel <= LONG_PRESS_MOVE_TOLERANCE) break;
+                    float[] start = XForm.transformPoint(xform, stylusDownX, stylusDownY);
+                    moveAbsoluteMouse((int) start[0], (int) start[1]);
+                    xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
+                    stylusButtonDragging = true;
+                }
+                handleStylusMove(event);
+                break;
+            case MotionEvent.ACTION_UP:
+                if (stylusButtonDragging) {
+                    handleStylusMove(event);
+                    xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
+                } else {
+                    float[] at = XForm.transformPoint(xform, stylusDownX, stylusDownY);
+                    moveAbsoluteMouse((int) at[0], (int) at[1]);
+                    xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
+                    xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
+                }
+                stylusButtonDragging = false;
+                stylusButtonStroke = false;
+                break;
+            case MotionEvent.ACTION_CANCEL:
+                if (stylusButtonDragging) {
+                    xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
+                }
+                stylusButtonDragging = false;
+                stylusButtonStroke = false;
+                break;
+        }
+        return true;
     }
 
     private static boolean isEventTriggeredByStylus(MotionEvent event) {
