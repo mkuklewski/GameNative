@@ -398,6 +398,15 @@ fun TouchGestureSettingsDialog(
                     onCheckedChange = { config = config.copy(showCursorInTouchscreenMode = it) },
                 )
 
+                // ── Stylus as finger ─────────────────────────────────────
+                SettingsSwitch(
+                    colors = settingsTileColorsAlt(),
+                    title = { Text(stringResource(R.string.gesture_stylus_as_finger)) },
+                    subtitle = { Text(stringResource(R.string.gesture_stylus_as_finger_subtitle)) },
+                    state = config.stylusAsFinger,
+                    onCheckedChange = { config = config.copy(stylusAsFinger = it) },
+                )
+
                 Spacer(modifier = Modifier.height(16.dp))
             }
         }

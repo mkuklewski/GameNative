@@ -1138,6 +1138,8 @@
     <string name="gesture_show_debug_overlay_subtitle">Show temporary gesture labels at top center</string>
     <string name="gesture_show_cursor_touchscreen_mode">Show Cursor in Touchscreen Mode</string>
     <string name="gesture_show_cursor_touchscreen_mode_subtitle">Keep the mouse cursor visible while touchscreen gestures are active</string>
+    <string name="gesture_stylus_as_finger">Stylus as Finger</string>
+    <string name="gesture_stylus_as_finger_subtitle">Stylus touches use the finger gestures above instead of acting as a mouse. Hover still moves the cursor; side button + touch is a right click</string>
 
     <string name="external_display_input">External Display Input</string>
     <string name="external_display_input_subtitle">Choose how a connected presentation display should behave</string>

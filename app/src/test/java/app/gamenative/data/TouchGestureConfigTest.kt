@@ -48,6 +48,22 @@ class TouchGestureConfigTest {
     }
 
     @Test
+    fun `stylus as finger defaults off for older configs`() {
+        val config = TouchGestureConfig.fromJson("""{"tapEnabled":true}""")
+
+        assertFalse(config.stylusAsFinger)
+    }
+
+    @Test
+    fun `stylus as finger round trips through json`() {
+        val expected = TouchGestureConfig(stylusAsFinger = true)
+
+        val json = JSONObject(expected.toJson())
+        assertTrue(json.getBoolean("stylusAsFinger"))
+        assertTrue(TouchGestureConfig.fromJson(expected.toJson()).stylusAsFinger)
+    }
+
+    @Test
     fun `action combo encodes and decodes with modifiers first`() {
         val combo = TouchGestureConfig.actionComboOf(listOf("key_1", "key_CTRL_L"))
 

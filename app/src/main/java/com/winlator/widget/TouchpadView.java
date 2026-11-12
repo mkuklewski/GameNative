@@ -95,6 +95,10 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
     // ── Gesture configuration ────────────────────────────────────────
     private TouchGestureConfig gestureConfig = new TouchGestureConfig();
 
+    // "Stylus as finger": true while the current stylus stroke started with the side
+    // button held, so it keeps the native stylus right-click instead of finger gestures.
+    private boolean stylusStrokeUsesMouse;
+
     // Long-press detection
     private Runnable longPressRunnable;
     private boolean longPressTriggered;
@@ -381,6 +385,9 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
         }
         if (event.getActionMasked() == MotionEvent.ACTION_DOWN) hasAbsoluteMousePosition = false;
         if (isStylus) {
+            if (shouldRouteStylusAsFinger(event)) {
+                return handleTouchscreenEvent(event);
+            }
             return handleStylusEvent(event);
         } else if (isTouchscreenMode) {
             return handleTouchscreenEvent(event);
@@ -439,6 +446,23 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
         }
 
         return true;
+    }
+
+    /**
+     * With "stylus as finger" enabled in touchscreen mode, stylus touches go through the same
+     * gesture pipeline as fingers (drag, long press, taps...). A stroke that starts with the
+     * side button (or eraser end) held keeps the native stylus right-click behaviour.
+     * Hover is handled separately and still moves the cursor.
+     */
+    private boolean shouldRouteStylusAsFinger(MotionEvent event) {
+        if (!isTouchscreenMode || !gestureConfig.getStylusAsFinger()) {
+            stylusStrokeUsesMouse = false;
+            return false;
+        }
+        if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+            stylusStrokeUsesMouse = isStylusButtonPressed(event);
+        }
+        return !stylusStrokeUsesMouse;
     }
 
     private static boolean isEventTriggeredByStylus(MotionEvent event) {

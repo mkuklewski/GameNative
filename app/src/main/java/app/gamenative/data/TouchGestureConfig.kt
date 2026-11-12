@@ -73,6 +73,11 @@ data class TouchGestureConfig(
 
     // 15. Movement mode used by mouse-button drag gestures
     val mouseDragMovementMode: String = MOUSE_DRAG_MOVEMENT_DIRECT,
+
+    // 16. Route stylus (S Pen) touches through the finger gestures instead of
+    //     treating the stylus as an absolute mouse. Hover still moves the cursor
+    //     and the stylus side button still gives a right click.
+    val stylusAsFinger: Boolean = false,
 ) {
 
     // ── Serialisation ────────────────────────────────────────────────────
@@ -120,6 +125,7 @@ data class TouchGestureConfig(
             put(KEY_SHOW_CURSOR_IN_TOUCHSCREEN_MODE, showCursorInTouchscreenMode)
             put(KEY_GESTURE_THRESHOLD, gestureThreshold)
             put(KEY_MOUSE_DRAG_MOVEMENT_MODE, mouseDragMovementMode)
+            put(KEY_STYLUS_AS_FINGER, stylusAsFinger)
         }.toString()
     }
 
@@ -206,6 +212,7 @@ data class TouchGestureConfig(
         private const val KEY_SHOW_CURSOR_IN_TOUCHSCREEN_MODE = "showCursorInTouchscreenMode"
         private const val KEY_GESTURE_THRESHOLD = "gestureThreshold"
         private const val KEY_MOUSE_DRAG_MOVEMENT_MODE = "mouseDragMovementMode"
+        private const val KEY_STYLUS_AS_FINGER = "stylusAsFinger"
 
         /**
          * Compatibility-safe defaults for existing (pre-overhaul) configs.
@@ -276,6 +283,7 @@ data class TouchGestureConfig(
                     mouseDragMovementMode = normalizeMouseDragMovementMode(
                         obj.optString(KEY_MOUSE_DRAG_MOVEMENT_MODE, MOUSE_DRAG_MOVEMENT_DIRECT),
                     ),
+                    stylusAsFinger = obj.optBoolean(KEY_STYLUS_AS_FINGER, false),
                 )
             } catch (_: Exception) {
                 compatibilityDefaults()
