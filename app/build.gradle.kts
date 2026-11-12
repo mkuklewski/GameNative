@@ -56,8 +56,12 @@ android {
     }
 
     defaultConfig {
-        // Personal fork build: installs side by side with the official app.
-        applicationId = "app.gamenative.avien"
+        // Same application ID as the official app: the gamescope payload is a
+        // prebuilt download with the official app's data paths compiled in, so a
+        // different ID breaks gamescope (Xwayland cannot load its keymap). The
+        // fork's own signing key means it replaces the official app instead of
+        // updating it.
+        applicationId = "app.gamenative"
 
         minSdk = 26
 

@@ -1,6 +1,6 @@
 name: GameNative S23 build
 
-# Personal fork build (app.gamenative.avien, "GameNative S23").
+# Personal fork build ("GameNative S23", application ID app.gamenative).
 # Builds the standard (legacy) universal APK, signs it with the key from the
 # AVIEN_KEYSTORE secret and publishes it as the latest GitHub release so it can be
 # downloaded straight from the phone: https://github.com/<owner>/<repo>/releases/latest
