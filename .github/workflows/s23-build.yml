@@ -7,11 +7,11 @@ name: GameNative S23 build
 
 on:
   push:
-    branches: [ "avien" ]
+    branches: [ "s23-pen-toggle-support" ]
   workflow_dispatch:
 
 concurrency:
-  group: avien-s23-build
+  group: s23-build
   cancel-in-progress: true
 
 permissions:
