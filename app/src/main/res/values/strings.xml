@@ -1141,7 +1141,7 @@
     <string name="gesture_stylus_as_finger">Stylus as Finger</string>
     <string name="gesture_stylus_as_finger_subtitle">Stylus touches use the finger gestures above instead of acting as a mouse. Hover still moves the cursor; side button + tap is a right click, side button + drag is a box selection</string>
     <string name="gesture_set_as_default">Set as Default for New Games</string>
-    <string name="gesture_set_as_default_subtitle">Saves these gestures for this game and makes new games start in touchscreen mode with them and with this game's radial menu</string>
+    <string name="gesture_set_as_default_subtitle">Saves these gestures for this game and makes new games start in touchscreen mode with them and with this game\'s radial menu</string>
     <string name="gesture_set_as_default_done">Saved as default for new games</string>
 
     <string name="external_display_input">External Display Input</string>
