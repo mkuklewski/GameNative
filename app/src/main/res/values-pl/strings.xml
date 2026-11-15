@@ -937,6 +937,9 @@
     <string name="gesture_show_cursor_touchscreen_mode_subtitle">Utrzymuj widoczny kursor myszy, gdy gesty dotykowe są aktywne</string>
     <string name="gesture_stylus_as_finger">Rysik jak palec</string>
     <string name="gesture_stylus_as_finger_subtitle">Dotyk rysikiem używa gestów palca zamiast działać jak mysz. Zawieszenie rysika nadal przesuwa kursor; przycisk boczny + stuknięcie to prawy klik, przycisk boczny + przeciągnięcie to zaznaczanie ramką</string>
+    <string name="gesture_set_as_default">Ustaw jako domyślne dla nowych gier</string>
+    <string name="gesture_set_as_default_subtitle">Zapisuje te gesty dla tej gry, a nowe gry uruchamiają się w trybie dotykowym z tymi gestami i menu radialnym tej gry</string>
+    <string name="gesture_set_as_default_done">Zapisano jako domyślne dla nowych gier</string>
 
     <!-- Shooter Mode -->
     <string name="shooter_mode_settings">Ustawienia dynamicznych joysticków</string>

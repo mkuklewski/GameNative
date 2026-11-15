@@ -3407,6 +3407,27 @@ fun XServerScreen(
                 applyMouseCursorVisibility()
                 ui.showTouchGestureDialog = false
             },
+            onSetAsDefault = { newConfig ->
+                // Save for this game first, exactly like the check mark does
+                ui.currentGestureConfig = newConfig
+                container.setGestureConfig(newConfig.toJson())
+                container.saveData()
+                PluviaApp.touchpadView?.setGestureConfig(newConfig)
+                PluviaApp.touchpadView?.setTouchscreenMode(ui.isTouchscreenModeActive)
+                applyMouseCursorVisibility()
+                // Then remember touch mode, gestures and radial menu for new games
+                PrefManager.defaultTouchscreenMode = true
+                PrefManager.defaultGestureConfig = newConfig.toJson()
+                PluviaApp.radialMenuCoordinator?.activeRadialMenuJson()?.let {
+                    PrefManager.defaultRadialMenu = it
+                }
+                android.widget.Toast.makeText(
+                    context,
+                    context.getString(R.string.gesture_set_as_default_done),
+                    android.widget.Toast.LENGTH_SHORT,
+                ).show()
+                ui.showTouchGestureDialog = false
+            },
         )
     }
 

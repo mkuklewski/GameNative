@@ -2,6 +2,7 @@ package app.gamenative.inputcontrols
 
 import android.content.Context
 import android.net.Uri
+import app.gamenative.PrefManager
 import app.gamenative.data.GyroSettings
 import app.gamenative.data.ShooterModeConfig
 import app.gamenative.data.TouchGestureConfig
@@ -175,9 +176,20 @@ object ControlProfileService {
         if (selected.isListed) {
             allStoredSections(sourceJson).forEach { inheritedSources[it] = selected.id }
         }
+        // GameNative S23: a game without a chosen controls profile starts with the
+        // radial menu saved with "Set as default for new games".
+        val usesAppDefaultProfile = (container.getExtra("profileId", "0").toIntOrNull() ?: 0) == 0
+        defaultRadialMenuJson()?.takeIf { usesAppDefaultProfile }?.let { menu ->
+            sourceJson.put("radialMenus", JSONArray().put(menu))
+            inheritedSources.remove(ControlProfileSection.RADIAL_MENU)
+        }
         writeSectionSources(sourceJson, inheritedSources)
         return sourceJson
     }
+
+    private fun defaultRadialMenuJson(): JSONObject? = runCatching {
+        PrefManager.defaultRadialMenu.takeIf { it.isNotBlank() }?.let { JSONObject(it) }
+    }.getOrNull()
 
     /** Migrates pre-library containers away from directly referencing editable global profiles. */
     fun migrateReferencedLibraryProfiles(context: Context, manager: InputControlsManager): Int =

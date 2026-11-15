@@ -68,6 +68,7 @@ fun TouchGestureSettingsDialog(
     gestureConfig: TouchGestureConfig,
     onDismiss: () -> Unit,
     onSave: (TouchGestureConfig) -> Unit,
+    onSetAsDefault: ((TouchGestureConfig) -> Unit)? = null,
 ) {
     var config by remember { mutableStateOf(gestureConfig) }
 
@@ -407,6 +408,25 @@ fun TouchGestureSettingsDialog(
                     state = config.stylusAsFinger,
                     onCheckedChange = { config = config.copy(stylusAsFinger = it) },
                 )
+
+                // ── Default for new games (GameNative S23) ───────────────
+                if (onSetAsDefault != null) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedButton(
+                        onClick = { onSetAsDefault(config) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                    ) {
+                        Text(stringResource(R.string.gesture_set_as_default))
+                    }
+                    Text(
+                        text = stringResource(R.string.gesture_set_as_default_subtitle),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
             }

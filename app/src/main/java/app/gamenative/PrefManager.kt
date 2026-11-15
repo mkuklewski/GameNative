@@ -661,6 +661,28 @@ object PrefManager {
             setPref(FORCE_DLC, value)
         }
 
+    // GameNative S23: touch controls saved with "Set as default for new games"
+    private val DEFAULT_TOUCHSCREEN_MODE = booleanPreferencesKey("s23_default_touchscreen_mode")
+    var defaultTouchscreenMode: Boolean
+        get() = getPref(DEFAULT_TOUCHSCREEN_MODE, BuildConfig.XR_BUILD)
+        set(value) {
+            setPref(DEFAULT_TOUCHSCREEN_MODE, value)
+        }
+
+    private val DEFAULT_GESTURE_CONFIG = stringPreferencesKey("s23_default_gesture_config")
+    var defaultGestureConfig: String
+        get() = getPref(DEFAULT_GESTURE_CONFIG, "")
+        set(value) {
+            setPref(DEFAULT_GESTURE_CONFIG, value)
+        }
+
+    private val DEFAULT_RADIAL_MENU = stringPreferencesKey("s23_default_radial_menu")
+    var defaultRadialMenu: String
+        get() = getPref(DEFAULT_RADIAL_MENU, "")
+        set(value) {
+            setPref(DEFAULT_RADIAL_MENU, value)
+        }
+
     private val LOCAL_SAVES_ONLY = booleanPreferencesKey("local_saves_only")
     var localSavesOnly: Boolean
         get() = getPref(LOCAL_SAVES_ONLY, false)

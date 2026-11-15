@@ -156,6 +156,9 @@ object ContainerUtils {
             containerVariant = PrefManager.containerVariant,
             forceDlc = PrefManager.forceDlc,
             localSavesOnly = PrefManager.localSavesOnly,
+            // GameNative S23: touch controls saved with "Set as default for new games"
+            touchscreenMode = PrefManager.defaultTouchscreenMode,
+            gestureConfig = PrefManager.defaultGestureConfig,
             steamOfflineMode = PrefManager.steamOfflineMode,
             loadMods = PrefManager.loadMods,
             epicOfflineMode = PrefManager.epicOfflineMode,
@@ -1029,6 +1032,10 @@ object ContainerUtils {
                 enableDInput = PrefManager.dinputEnabled,
                 dinputMapperType = PrefManager.dinputMapperType.toByte(),
                 disableMouseInput = PrefManager.disableMouseInput,
+                localSavesOnly = PrefManager.localSavesOnly,
+                // GameNative S23: touch controls saved with "Set as default for new games"
+                touchscreenMode = PrefManager.defaultTouchscreenMode,
+                gestureConfig = PrefManager.defaultGestureConfig,
                 forceDlc = PrefManager.forceDlc,
                 steamOfflineMode = PrefManager.steamOfflineMode,
                 loadMods = PrefManager.loadMods,

@@ -358,6 +358,11 @@ class RadialMenuCoordinator(
         return profile ?: manager.getProfile(0) ?: manager.getProfiles(false).firstOrNull()
     }
 
+    /** Current game's radial menu as JSON, for "Set as default for new games". */
+    fun activeRadialMenuJson(): String? = runCatching {
+        (activeMenu() ?: getOrCreateGameControlsProfile()?.defaultRadialMenu)?.toJSONObject()?.toString()
+    }.getOrNull()
+
     private fun activeMenu(): RadialMenu? {
         return activeProfile()?.defaultRadialMenu
     }
