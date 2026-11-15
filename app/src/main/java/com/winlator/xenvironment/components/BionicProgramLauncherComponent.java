@@ -22,6 +22,7 @@ import com.winlator.PrefManager;
 import app.gamenative.PluviaApp;
 import app.gamenative.display.GameNativeDrm;
 import app.gamenative.display.GamescopeSettings;
+import app.gamenative.utils.FexCodeCaches;
 import app.gamenative.utils.FexCodeMaps;
 import app.gamenative.utils.LsfgQuickMenuHelper;
 import app.gamenative.shadercache.FossilizeManager;
@@ -44,6 +45,7 @@ import com.winlator.core.ProcessHelper;
 import com.winlator.core.SharedComponents;
 import com.winlator.core.TarCompressorUtils;
 import com.winlator.core.WineInfo;
+import com.winlator.fexcore.FEXCoreManager;
 import com.winlator.fexcore.FEXCorePreset;
 import com.winlator.fexcore.FEXCorePresetManager;
 import com.winlator.sysvshm.SysVSHMConnectionHandler;
@@ -95,7 +97,11 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
     }
 
     public Container getContainer() { return this.container; }
-    public void setContainer(Container container) { this.container = container; }
+    public void setContainer(Container container) {
+        this.container = container;
+        // A session that was killed leaves its file behind; helper commands run before the next write.
+        if (container != null) FEXCoreManager.deleteContainerConfig(container.getRootDir());
+    }
 
     // Resolve which libredirect shim to preload. Normally the flavor default
     // (PRELOAD_BIONIC_SO). When the container disables libredirect, modern falls
@@ -145,9 +151,13 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
     public void setPreUnpack(Runnable r) { this.preUnpack = r; }
     private BooleanSupplier launchCancelled;
     public void setLaunchCancelled(BooleanSupplier launchCancelled) { this.launchCancelled = launchCancelled; }
+    // False while the guest executable is a prerequisite installer that runs before the game.
+    private boolean gameStart = true;
+    public void setGameStart(boolean gameStart) { this.gameStart = gameStart; }
     @Override
     public void start() {
         synchronized (lock) {
+            FexCodeCaches.onGuestStarting(environment.getContext(), contentsManager, this, gameStart);
             stop();
             if (wineInfo.isArm64EC())
                 extractEmulatorsDlls();
@@ -155,6 +165,7 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
                 extractBox64Files();
             if (preUnpack != null) preUnpack.run();
             if (launchCancelled != null && launchCancelled.getAsBoolean()) throw new IllegalStateException("Launch cancelled before the guest started");
+            FexCodeCaches.onGuestReady(this);
             pid = execGuestProgram();
             Log.d("BionicProgramLauncherComponent", "Process " + pid + " started");
             SteamService.setKeepAlive(true);
@@ -174,6 +185,7 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
                 SteamService.setKeepAlive(false);
             }
             execShellCommand("wineserver -k");
+            if (container != null) FEXCoreManager.deleteContainerConfig(container.getRootDir());
         }
     }
 
@@ -226,6 +238,8 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
     }
 
     public void setFEXCorePreset (String fexcorePreset) { this.fexcorePreset = fexcorePreset; }
+
+    public String getFEXCorePreset() { return fexcorePreset; }
 
     public File getWorkingDir() {
         return workingDir;
@@ -289,7 +303,10 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
             envVars.put("EVSHIM_SHM_ID", 1);
         }
         addBox64EnvVars(envVars, enableBox86_64Logs);
-        envVars.putAll(FEXCorePresetManager.getEnvVars(context, fexcorePreset));
+        EnvVars fexPreset = FEXCorePresetManager.getEnvVars(context, fexcorePreset);
+        boolean fexContainerConfig = wineInfo.isArm64EC() && container != null;
+        EnvVars fexConfig = fexContainerConfig ? FEXCoreManager.takeAppConfigOptions(fexPreset) : new EnvVars();
+        envVars.putAll(fexPreset);
 
         String renderer = GPUInformation.getRenderer(context);
 
@@ -458,10 +475,18 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
 
         // Code-map capture (input for offline code caches, uploaded after exit) is decided here, after
         // every preset and container variable has been merged, so nothing can override the gate.
+        envVars.remove("FEX_ENABLECODECACHINGWIP");
+        fexConfig.remove("FEX_ENABLECODECACHINGWIP");
         if (FexCodeMaps.captureEnabled(context, contentsManager, container)) {
-            envVars.put("FEX_ENABLECODECACHINGWIP", "1");
-        } else {
-            envVars.remove("FEX_ENABLECODECACHINGWIP");
+            (fexContainerConfig ? fexConfig : envVars).put("FEX_ENABLECODECACHINGWIP", "1");
+        }
+
+        // Through Config.json so the per-app files of the Steam client and launcher helpers override these options.
+        if (fexContainerConfig && !FEXCoreManager.writeContainerConfig(container.getRootDir(), fexConfig)) {
+            Log.e("BionicProgramLauncherComponent", "Could not write the FEX container config; passing it as environment variables");
+            for (String name : fexConfig) {
+                if (!envVars.has(name)) envVars.put(name, fexConfig.get(name));
+            }
         }
 
         if (BuildConfig.XR_BUILD) {

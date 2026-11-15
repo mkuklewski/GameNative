@@ -1044,6 +1044,7 @@
 	<string name="settings_performance_shared_shader_cache_subtitle">Partajează cu alți jucători shaderele înregistrate în timp ce joci. Dezactivarea oprește și descărcarea cache-urilor partajate care reduc sacadările</string>
 	<string name="shader_cache_preparing">Se pregătesc shaderele…</string>
 	<string name="shader_cache_preparing_progress">Se pregătesc shaderele %1$d%%</string>
+	<string name="fex_code_cache_building">Se construiește memoria cache de cod… (%1$d/%2$d)</string>
 
 	<!-- Settings: Emulation Group -->
 	<string name="settings_emulation_title">Emulare</string>
@@ -1051,6 +1052,7 @@
     <string name="settings_accounts_signed_out">Neautentificat</string>
     <string name="settings_accounts_ea_title">Cont EA</string>
     <string name="settings_accounts_rockstar_title">Cont Rockstar</string>
+    <string name="settings_accounts_ubisoft_title">Cont Ubisoft</string>
     <string name="gamenative_account_title">Cont GameNative</string>
     <string name="gamenative_account_sign_in">Conectare</string>
     <string name="gamenative_account_sign_in_subtitle">Conectează-te pentru a vedea planul tău și a-ți gestiona abonamentul.</string>
@@ -1151,10 +1153,10 @@
     <string name="support_checkout_no_browser">Nu s-a găsit niciun browser pentru a deschide pagina de plată. Scanează codul cu alt dispozitiv.</string>
     <string name="support_checkout_failed">Pagina de plată nu a putut fi deschisă. Verifică-ți conexiunea și încearcă din nou.</string>
     <string name="support_checkout_done">Gata</string>
-    <string name="main_thank_you_message_play">Devino membru astăzi. Membrii primesc:\n\n• Ajutor cu AI pentru a-ți face jocurile să funcționeze\n• Acces anticipat la versiuni noi\n• Roluri premium și canale exclusive pe Discord\n• …și altele\n\nDe la %1$s/lună</string>
+    <string name="main_thank_you_message_play">Devino membru astăzi. Membrii primesc:\n\n• Optimizează: jocuri care merg mai bine, reglate pentru dispozitivul și stilul tău de joc\n• Ajutor cu AI pentru a-ți face jocurile să funcționeze\n• Acces anticipat la build-uri noi\n• Roluri premium și canale exclusive pe Discord\n• …și altele\n\nDe la %1$s/lună</string>
     <string name="support_plan_pro_title_priced">%1$s/lună · Pro</string>
     <string name="support_plan_basic_title_priced">%1$s/lună · Basic</string>
-    <string name="membership_plans_pitch">Membrii primesc ajutor cu AI pentru a-și face jocurile să funcționeze, acces anticipat la versiuni noi și roluri premium pe Discord.</string>
+    <string name="membership_plans_pitch">Membrii primesc Optimizează, care învață din stilul tău de joc ca jocurile tale să meargă mai bine, ajutor cu AI pentru a-ți face jocurile să funcționeze și acces anticipat la build-uri.</string>
     <string name="membership_plans_title">Devino membru</string>
     <string name="support_already_member">Ești deja membru? Conectează-te</string>
     <string name="support_checkout_expired">Această plată a expirat. Dacă ai plătit deja, conectează-te cu e-mailul folosit și planul va apărea.</string>
@@ -1197,8 +1199,10 @@
 	<string name="settings_emulation_default_config_dialog_title">Config container implicit</string>
 	<string name="settings_emulation_auto_apply_known_config_title">Aplică automat configurația cunoscută</string>
 	<string name="settings_emulation_auto_apply_known_config_subtitle">Aplică automat setările recomandate pentru jocurile Steam la prima lansare</string>
-	<string name="settings_emulation_fex_code_cache_title">Cache-uri de cod FEX</string>
-	<string name="settings_emulation_fex_code_cache_subtitle">Partajează ce cod a tradus FEX și descarcă traduceri precompilate pentru porniri mai rapide. Cache-urile ocupă spațiu în prefixul jocului.</string>
+	<string name="settings_emulation_fex_code_map_upload_title">Încarcă hărțile de cod FEX</string>
+	<string name="settings_emulation_fex_code_map_upload_subtitle">Trimite ce blocuri de cod din executabilele unui joc au rulat, fără date personale. De obicei sub 1 MB per joc.</string>
+	<string name="settings_emulation_fex_code_cache_use_title">Folosește memoria cache de cod FEX (experimental)</string>
+	<string name="settings_emulation_fex_code_cache_use_subtitle">Poate accelera pornirile și reduce utilizarea procesorului, poate ocupa câteva sute de MB per joc și adaugă un pas suplimentar la pornirea jocurilor</string>
 	<string name="settings_emulation_box64_presets_title">Presetări Box64</string>
 	<string name="settings_emulation_box64_presets_subtitle">Vizualizează, modifică și creează presetări Box64</string>
 	<string name="settings_emulation_driver_manager_title">Manager drivere</string>
@@ -1246,17 +1250,15 @@
 
     <!-- Settings: Themes -->
     <string name="themes_title">Teme</string>
-    <string name="themes_manage">Gestionează temele</string>
-    <string name="themes_settings_subtitle">Instalează și combină teme Steam Deck CSS Loader. Activate: %1$d</string>
     <string name="themes_tab_installed">Instalate</string>
-    <string name="themes_tab_steam_deck">Steam Deck</string>
+    <string name="themes_tab_steam_deck">Stil SteamOS</string>
     <string name="themes_import_zip">Importă zip</string>
     <string name="themes_import_folder">Importă dosar</string>
     <string name="themes_create_starter">Creează temă de pornire</string>
     <string name="themes_empty">Nicio temă instalată încă. Importă una sau răsfoiește magazinul.</string>
     <string name="themes_by_author">de %1$s</string>
     <string name="themes_changes">Modifică: %1$s</string>
-    <string name="themes_field_colours">culori</string>
+    <string name="themes_field_colors">culori</string>
     <string name="themes_field_corners">colțuri</string>
     <string name="themes_field_font">font</string>
     <string name="themes_field_background">fundal</string>
@@ -1273,6 +1275,8 @@
     <string name="themes_choose_image">Alege imaginea</string>
     <string name="themes_clear_image">Golește</string>
     <string name="themes_no_image">Nicio imagine</string>
+    <string name="themes_choose_font">Alege fontul</string>
+    <string name="themes_no_font">Niciun font</string>
     <string name="themes_hue">Nuanță</string>
     <string name="themes_saturation">Saturație</string>
     <string name="themes_brightness">Luminozitate</string>
@@ -1285,6 +1289,12 @@
     <string name="themes_load_more">Încarcă mai multe</string>
     <string name="themes_store_error">Magazinul de teme nu a putut fi încărcat: %1$s</string>
     <string name="themes_store_empty">Nu s-au găsit teme</string>
+    <string name="themes_store_compat_note">Create pentru SteamOS. GameNative adaptează aceste teme, așa că doar cele verificate au fost testate să arate ca în capturile de ecran.</string>
+    <string name="themes_compat_verified">Verificată</string>
+    <string name="themes_compat_incompatible">Incompatibilă</string>
+    <string name="themes_compat_incompatible_note">Această temă schimbă părți din SteamOS pe care GameNative nu le are.</string>
+    <string name="themes_compat_unverified">Neverificată</string>
+    <string name="themes_compat_unverified_note">Poate arăta diferit față de captura de ecran.</string>
     <string name="themes_retry">Reîncearcă</string>
     <string name="themes_custom_subtitle">Alege-ți propriile culori și aspectul</string>
     <string name="themes_field_effects">efecte</string>
@@ -1329,7 +1339,7 @@
     <string name="themes_share_updated">%1$s a fost actualizată în lista comunității</string>
     <string name="themes_shared_note">Partajată cu comunitatea</string>
     <string name="themes_share_blocked_title">Această temă nu poate fi partajată</string>
-    <string name="themes_share_blocked_not_native">Pot fi partajate doar temele create cu variabilele proprii GameNative, inclusiv tema personalizată. Temele Steam Deck nu pot fi partajate.</string>
+    <string name="themes_share_blocked_not_native">Pot fi partajate doar temele create cu variabilele proprii GameNative, inclusiv tema personalizată. Temele în stil SteamOS nu pot fi partajate.</string>
     <string name="themes_share_blocked_empty">Această temă nu schimbă încă nimic. Schimbă mai întâi câteva culori sau opțiuni.</string>
     <string name="themes_share_blocked_too_large">Această temă este prea mare pentru a fi partajată.</string>
     <string name="themes_sign_in_title">Este necesar un cont GameNative</string>
@@ -1484,7 +1494,7 @@
 	<string name="main_recent_crash_title">Crash recent</string>
 	<string name="main_recent_crash_message">Ne pare rău!\nAr fi util să știm ce problemă ai întâmpinat.\nPoți vizualiza și exporta cel mai recent crash log din setările aplicației și îl poți atașa ca issue pe Github în repository-ul proiectului.\nLinkul către repo este tot în setări!</string>
     <string name="main_thank_you_title">Îți place GameNative?</string>
-    <string name="main_thank_you_message">Devino membru astăzi. Membrii primesc:\n\n• Ajutor cu AI pentru a-ți face jocurile să funcționeze\n• Acces anticipat la versiuni noi\n• Roluri premium și canale exclusive pe Discord\n• …și altele\n\nDe la 5 $/lună</string>
+    <string name="main_thank_you_message">Devino membru astăzi. Membrii primesc:\n\n• Optimizează: jocuri care merg mai bine, reglate pentru dispozitivul și stilul tău de joc\n• Ajutor cu AI pentru a-ți face jocurile să funcționeze\n• Acces anticipat la build-uri noi\n• Roluri premium și canale exclusive pe Discord\n• …și altele\n\nDe la 5 $/lună</string>
     <string name="main_join_kofi">Devino membru</string>
     <string name="pitch_session_title">Îți place %1$s?</string>
     <string name="pitch_five_star_title">Ne bucurăm că %1$s a mers excelent!</string>
@@ -1671,6 +1681,8 @@
 	<string name="library_layout_capsule">Capsulă</string>
 	<string name="library_layout_hero">Hero</string>
 	<string name="library_layout_carousel">Carusel</string>
+	<string name="library_layout_shelf">Raft</string>
+	<string name="library_no_playtime">Încă niciun timp de joc</string>
 	<string name="library_search_placeholder">Caută jocurile tale…</string>
 	<string name="library_search_description">Căutare</string>
 	<string name="library_search_clear">Șterge căutarea</string>
@@ -2218,6 +2230,7 @@
 	<string name="game_launch_tip_23">Sfat: Dacă aveți un GPU Mali, vă rugăm să utilizați driverele de sistem.</string>
 	<string name="game_launch_tip_24">Sfat: Ecran negru? Încercați opțiunea \"%s\" din meniu pentru a verifica dacă driverele dvs. funcționează corect.</string>
 	<string name="game_launch_tip_25">Sfat: Utilizați Proton x86-64 dacă nu puteți face clic cu mouse-ul în jocuri.</string>
+	<string name="launch_skip">Sari peste</string>
     <string name="launch_bionic_steam_description">Activează jocul online și îmbunătățește compatibilitatea\nNu funcționează întotdeauna\nFă backup salvărilor înainte să încerci</string>
 
     <!-- Frontend Sync Settings -->
@@ -3249,6 +3262,15 @@
     <string name="rockstar_preparing">Se pregătește suportul pentru launcherul Rockstar</string>
     <string name="rockstar_runtime_installing">Se instalează runtime-ul Social Club</string>
     <string name="rockstar_installer_missing">Programul de instalare Social Club lipsește din fișierele jocului. Verifică fișierele jocului în Steam și încearcă din nou.</string>
+    <string name="ubisoft_preparing">Se pregătește suportul Ubisoft Connect</string>
+    <string name="ubisoft_runtime_installing">Se descarcă fișierele Ubisoft Connect de la Ubisoft</string>
+    <string name="ubisoft_login_required_title">Este necesară conectarea la Ubisoft</string>
+    <string name="ubisoft_login_failed">Conectarea la Ubisoft a eșuat: %1$s</string>
+    <string name="ubisoft_error_title">Ubisoft Connect</string>
+    <string name="ubisoft_error_session">Ubisoft nu a acceptat conectarea. Deconectează-te de la Ubisoft din Setări și conectează-te din nou.</string>
+    <string name="ubisoft_error_not_owned">Acest cont Ubisoft nu are jocul, iar copia de pe Steam nu a putut fi adăugată în el.</string>
+    <string name="ubisoft_error_activation">Ubisoft a refuzat activarea acestui joc.</string>
+    <string name="ubisoft_error_generic">Suportul Ubisoft Connect s-a oprit cu eroarea %1$d.</string>
     <string name="nexus_mod_order_blocked_managed_files">Ordinea modurilor nu a fost schimbată. Fișiere gestionate lipsă sau modificate: %1$d. Verifică mai întâi starea instalării și rezolvă problemele.</string>
     <string name="nexus_placement_complete_summary">Plasare finalizată. Total: %1$d; actualizate: %2$d; deja la zi: %3$d; cu copii de rezervă: %4$d%5$s</string>
     <string name="nexus_apply_failed_rolled_back">Instalarea a eșuat; s-a încercat revenirea în siguranță. Erori: %1$d</string>

@@ -657,6 +657,15 @@
     <string name="rockstar_preparing">Подготовка поддержки лаунчера Rockstar</string>
     <string name="rockstar_runtime_installing">Установка среды Social Club</string>
     <string name="rockstar_installer_missing">В файлах игры отсутствует установщик Social Club. Проверьте файлы игры в Steam и попробуйте снова.</string>
+    <string name="ubisoft_preparing">Подготовка поддержки Ubisoft Connect</string>
+    <string name="ubisoft_runtime_installing">Загрузка файлов Ubisoft Connect с серверов Ubisoft</string>
+    <string name="ubisoft_login_required_title">Требуется вход в Ubisoft</string>
+    <string name="ubisoft_login_failed">Не удалось войти в Ubisoft: %1$s</string>
+    <string name="ubisoft_error_title">Ubisoft Connect</string>
+    <string name="ubisoft_error_session">Ubisoft не принял вход. Выйдите из Ubisoft в настройках и войдите снова.</string>
+    <string name="ubisoft_error_not_owned">На этом аккаунте Ubisoft нет игры, и копию из Steam не удалось к нему добавить.</string>
+    <string name="ubisoft_error_activation">Ubisoft отказался активировать эту игру.</string>
+    <string name="ubisoft_error_generic">Поддержка Ubisoft Connect остановилась с ошибкой %1$d.</string>
     <string name="gog_logout_failed">Ошибка выхода: %s</string>
     <string name="gog_logout_success">Успешно вышли из GOG</string>
     <string name="gog_settings_login_title">Войти в GOG</string>
@@ -762,6 +771,8 @@ Ubuntu RootFs - releases.ubuntu.com/focal</string>
     <string name="library_layout">Макет</string>
     <string name="library_layout_capsule">Капсула</string>
     <string name="library_layout_carousel">Карусель</string>
+    <string name="library_layout_shelf">Полка</string>
+    <string name="library_no_playtime">Ещё не запускалась</string>
     <string name="library_layout_hero">Герой</string>
     <string name="library_layout_list">Список</string>
     <string name="library_layout_title">Макет</string>
@@ -885,7 +896,7 @@ Ubuntu RootFs - releases.ubuntu.com/focal</string>
     <string name="main_save_conflict_upgrade_v1_title">Выберите версию сохранения</string>
     <string name="main_save_conflict_upgrade_v1_message">Мы исправили обработку путей облачных сохранений для этой игры и обнаружили различия между локальным и облачным сохранением.\n\nЛокальное сохранение:\n\t%1$s\nОблачное сохранение:\n\t%2$s</string>
     <string name="main_thank_you_title">Нравится GameNative?</string>
-    <string name="main_thank_you_message">Станьте участником сегодня. Участники получают:\n\n• Помощь ИИ с запуском игр\n• Ранний доступ к новым версиям\n• Премиум-роли и эксклюзивные каналы в Discord\n• …и не только\n\nОт $5/мес.</string>
+    <string name="main_thank_you_message">Станьте участником сегодня. Участники получают:\n\n• Оптимизация: игры работают лучше, с настройкой под ваше устройство и стиль игры\n• Помощь ИИ с запуском игр\n• Ранний доступ к новым сборкам\n• Премиум-роли и эксклюзивные каналы в Discord\n• …и не только\n\nОт $5/мес.</string>
     <string name="main_join_kofi">Стать участником</string>
     <string name="pitch_session_title">Нравится %1$s?</string>
     <string name="pitch_five_star_title">Рады, что %1$s отлично работает!</string>
@@ -1202,8 +1213,10 @@ https://gamenative.app
     <string name="settings_download_speed">Скорость загрузки</string>
     <string name="settings_downloads_title">Загрузки</string>
     <string name="settings_emulation_auto_apply_known_config_subtitle">Автоматически применять рекомендуемые настройки для игр Steam при первом запуске</string>
-	<string name="settings_emulation_fex_code_cache_title">Кэши кода FEX</string>
-	<string name="settings_emulation_fex_code_cache_subtitle">Делитесь тем, какой код перевёл FEX, и загружайте готовые переводы для более быстрого запуска. Кэши занимают место в префиксе игры.</string>
+	<string name="settings_emulation_fex_code_map_upload_title">Отправлять карты кода FEX</string>
+	<string name="settings_emulation_fex_code_map_upload_subtitle">Отправляет сведения о том, какие блоки кода исполняемых файлов игры выполнялись, без личных данных. Обычно менее 1 МБ на игру.</string>
+	<string name="settings_emulation_fex_code_cache_use_title">Использовать кэш кода FEX (экспериментально)</string>
+	<string name="settings_emulation_fex_code_cache_use_subtitle">Может ускорить запуск и снизить нагрузку на процессор, может занимать несколько сотен МБ на игру и добавляет дополнительный шаг при запуске игр</string>
     <string name="settings_emulation_auto_apply_known_config_title">Автоматически применять известную конфигурацию</string>
     <string name="settings_emulation_box64_presets_subtitle">Просмотр, изменение и создание предустановок Box64</string>
     <string name="settings_emulation_box64_presets_title">Предустановки Box64</string>
@@ -1221,6 +1234,7 @@ https://gamenative.app
     <string name="settings_performance_shared_shader_cache_subtitle">Делиться с другими игроками шейдерами, записанными во время игры. Если выключить, общий кэш, уменьшающий подтормаживания, тоже не будет скачиваться</string>
     <string name="shader_cache_preparing">Подготовка шейдеров…</string>
     <string name="shader_cache_preparing_progress">Подготовка шейдеров %1$d%%</string>
+    <string name="fex_code_cache_building">Создание кэша кода… (%1$d/%2$d)</string>
 
     <string name="settings_emulation_driver_manager_title">Менеджер драйверов</string>
     <string name="settings_emulation_orientations_subtitle">Выберите, какие ориентации можно повернуть во время игры</string>
@@ -1230,6 +1244,7 @@ https://gamenative.app
     <string name="settings_accounts_signed_out">Вход не выполнен</string>
     <string name="settings_accounts_ea_title">Учётная запись EA</string>
     <string name="settings_accounts_rockstar_title">Учётная запись Rockstar</string>
+    <string name="settings_accounts_ubisoft_title">Аккаунт Ubisoft</string>
     <string name="gamenative_account_title">Аккаунт GameNative</string>
     <string name="gamenative_account_sign_in">Войти</string>
     <string name="gamenative_account_sign_in_subtitle">Войдите, чтобы увидеть свой тариф и управлять подпиской.</string>
@@ -1331,10 +1346,10 @@ https://gamenative.app
     <string name="support_checkout_no_browser">Не найден браузер для открытия страницы оплаты. Отсканируйте код другим устройством.</string>
     <string name="support_checkout_failed">Не удалось открыть страницу оплаты. Проверьте соединение и попробуйте снова.</string>
     <string name="support_checkout_done">Готово</string>
-    <string name="main_thank_you_message_play">Станьте участником сегодня. Участники получают:\n\n• Помощь ИИ с запуском игр\n• Ранний доступ к новым версиям\n• Премиум-роли и эксклюзивные каналы в Discord\n• …и не только\n\nОт %1$s/мес.</string>
+    <string name="main_thank_you_message_play">Станьте участником сегодня. Участники получают:\n\n• Оптимизация: игры работают лучше, с настройкой под ваше устройство и стиль игры\n• Помощь ИИ с запуском игр\n• Ранний доступ к новым сборкам\n• Премиум-роли и эксклюзивные каналы в Discord\n• …и не только\n\nОт %1$s/мес.</string>
     <string name="support_plan_pro_title_priced">%1$s/месяц · Pro</string>
     <string name="support_plan_basic_title_priced">%1$s/месяц · Basic</string>
-    <string name="membership_plans_pitch">Участники получают помощь ИИ с запуском игр, ранний доступ к новым версиям и премиум-роли в Discord.</string>
+    <string name="membership_plans_pitch">Участники получают Оптимизацию, которая учится на вашем стиле игры, чтобы ваши игры работали лучше, помощь ИИ с запуском игр и ранний доступ к сборкам.</string>
     <string name="membership_plans_title">Стать участником</string>
     <string name="support_already_member">Уже участник? Войти</string>
     <string name="support_checkout_expired">Время оплаты истекло. Если вы уже заплатили, войдите с использованным адресом эл. почты, и план появится.</string>
@@ -1404,17 +1419,15 @@ https://gamenative.app
     <string name="settings_interface_storage_volume_title">Том хранилища</string>
     <!-- Settings: Themes -->
     <string name="themes_title">Темы</string>
-    <string name="themes_manage">Управление темами</string>
-    <string name="themes_settings_subtitle">Устанавливайте и сочетайте темы Steam Deck CSS Loader. Включено: %1$d</string>
     <string name="themes_tab_installed">Установленные</string>
-    <string name="themes_tab_steam_deck">Steam Deck</string>
+    <string name="themes_tab_steam_deck">В стиле SteamOS</string>
     <string name="themes_import_zip">Импорт zip</string>
     <string name="themes_import_folder">Импорт папки</string>
     <string name="themes_create_starter">Создать стартовую тему</string>
     <string name="themes_empty">Темы ещё не установлены. Импортируйте тему или откройте магазин.</string>
     <string name="themes_by_author">автор: %1$s</string>
     <string name="themes_changes">Меняет: %1$s</string>
-    <string name="themes_field_colours">цвета</string>
+    <string name="themes_field_colors">цвета</string>
     <string name="themes_field_corners">углы</string>
     <string name="themes_field_font">шрифт</string>
     <string name="themes_field_background">фон</string>
@@ -1431,6 +1444,8 @@ https://gamenative.app
     <string name="themes_choose_image">Выбрать изображение</string>
     <string name="themes_clear_image">Очистить</string>
     <string name="themes_no_image">Нет изображения</string>
+    <string name="themes_choose_font">Выбрать шрифт</string>
+    <string name="themes_no_font">Нет шрифта</string>
     <string name="themes_hue">Оттенок</string>
     <string name="themes_saturation">Насыщенность</string>
     <string name="themes_brightness">Яркость</string>
@@ -1443,6 +1458,12 @@ https://gamenative.app
     <string name="themes_load_more">Загрузить ещё</string>
     <string name="themes_store_error">Не удалось загрузить магазин тем: %1$s</string>
     <string name="themes_store_empty">Темы не найдены</string>
+    <string name="themes_store_compat_note">Созданы для SteamOS. GameNative адаптирует эти темы, поэтому сходство со скриншотами проверено только у проверенных тем.</string>
+    <string name="themes_compat_verified">Проверена</string>
+    <string name="themes_compat_incompatible">Несовместима</string>
+    <string name="themes_compat_incompatible_note">Эта тема меняет части SteamOS, которых нет в GameNative.</string>
+    <string name="themes_compat_unverified">Не проверена</string>
+    <string name="themes_compat_unverified_note">Может выглядеть иначе, чем на скриншоте.</string>
     <string name="themes_retry">Повторить</string>
     <string name="themes_custom_subtitle">Выберите свои цвета и макет</string>
     <string name="themes_field_effects">эффекты</string>
@@ -1487,7 +1508,7 @@ https://gamenative.app
     <string name="themes_share_updated">Тема %1$s обновлена в списке сообщества</string>
     <string name="themes_shared_note">Опубликовано в сообществе</string>
     <string name="themes_share_blocked_title">Этой темой нельзя поделиться</string>
-    <string name="themes_share_blocked_not_native">Делиться можно только темами, созданными на собственных переменных GameNative, включая пользовательскую тему. Темами Steam Deck делиться нельзя.</string>
+    <string name="themes_share_blocked_not_native">Делиться можно только темами, созданными на собственных переменных GameNative, включая пользовательскую тему. Темами в стиле SteamOS делиться нельзя.</string>
     <string name="themes_share_blocked_empty">Эта тема пока ничего не меняет. Сначала измените цвета или параметры.</string>
     <string name="themes_share_blocked_too_large">Эта тема слишком большая, чтобы ей поделиться.</string>
     <string name="themes_sign_in_title">Нужен аккаунт GameNative</string>
@@ -2178,6 +2199,7 @@ https://gamenative.app
     <string name="game_launch_tip_23">Совет: Если у вас GPU Mali, используйте системные драйверы.</string>
     <string name="game_launch_tip_24">Совет: Черный экран? Попробуйте использовать опцию \"%s\" в меню, чтобы проверить, правильно ли работают ваши драйверы.</string>
     <string name="game_launch_tip_25">Совет: Используйте Proton x86-64, если вы не можете нажать мышью в играх.</string>
+    <string name="launch_skip">Пропустить</string>
     <string name="launch_bionic_steam_description">Включает онлайн-игру и улучшает совместимость\nРаботает не всегда\nСделайте резервную копию сохранений перед использованием</string>
 
     <!-- Frontend Sync Settings -->

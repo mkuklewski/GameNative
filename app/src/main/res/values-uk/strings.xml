@@ -1038,6 +1038,7 @@
     <string name="settings_performance_shared_shader_cache_subtitle">Ділитися з іншими гравцями шейдерами, записаними під час гри. Якщо вимкнути, спільний кеш, що зменшує підвисання, теж не завантажуватиметься</string>
     <string name="shader_cache_preparing">Підготовка шейдерів…</string>
     <string name="shader_cache_preparing_progress">Підготовка шейдерів %1$d%%</string>
+    <string name="fex_code_cache_building">Створення кешу коду… (%1$d/%2$d)</string>
 
     <!-- Settings: Emulation Group -->
     <string name="settings_emulation_title">Емуляція</string>
@@ -1045,6 +1046,7 @@
     <string name="settings_accounts_signed_out">Вхід не виконано</string>
     <string name="settings_accounts_ea_title">Обліковий запис EA</string>
     <string name="settings_accounts_rockstar_title">Обліковий запис Rockstar</string>
+    <string name="settings_accounts_ubisoft_title">Обліковий запис Ubisoft</string>
     <string name="gamenative_account_title">Обліковий запис GameNative</string>
     <string name="gamenative_account_sign_in">Увійти</string>
     <string name="gamenative_account_sign_in_subtitle">Увійдіть, щоб побачити свій тариф і керувати підпискою.</string>
@@ -1146,10 +1148,10 @@
     <string name="support_checkout_no_browser">Не знайдено браузер для відкриття сторінки оплати. Відскануйте код іншим пристроєм.</string>
     <string name="support_checkout_failed">Не вдалося відкрити сторінку оплати. Перевірте з\'єднання та спробуйте ще раз.</string>
     <string name="support_checkout_done">Готово</string>
-    <string name="main_thank_you_message_play">Станьте учасником сьогодні. Учасники отримують:\n\n• Допомогу ШІ із запуском ігор\n• Ранній доступ до нових версій\n• Преміум-ролі та ексклюзивні канали в Discord\n• …та інше\n\nВід %1$s/міс.</string>
+    <string name="main_thank_you_message_play">Станьте учасником сьогодні. Учасники отримують:\n\n• Оптимізація: ігри працюють краще, з налаштуванням під ваш пристрій і стиль гри\n• Допомогу ШІ із запуском ігор\n• Ранній доступ до нових збірок\n• Преміум-ролі та ексклюзивні канали в Discord\n• …та інше\n\nВід %1$s/міс.</string>
     <string name="support_plan_pro_title_priced">%1$s/місяць · Pro</string>
     <string name="support_plan_basic_title_priced">%1$s/місяць · Basic</string>
-    <string name="membership_plans_pitch">Учасники отримують допомогу ШІ із запуском ігор, ранній доступ до нових версій і преміум-ролі в Discord.</string>
+    <string name="membership_plans_pitch">Учасники отримують Оптимізацію, яка вчиться на вашому стилі гри, щоб ваші ігри працювали краще, допомогу ШІ із запуском ігор і ранній доступ до збірок.</string>
     <string name="membership_plans_title">Стати учасником</string>
     <string name="support_already_member">Уже учасник? Увійти</string>
     <string name="support_checkout_expired">Час оплати минув. Якщо ви вже заплатили, увійдіть з використаною електронною адресою, і план з\'явиться.</string>
@@ -1192,8 +1194,10 @@
     <string name="settings_emulation_default_config_dialog_title">Стандартні налаштування контейнера</string>
     <string name="settings_emulation_auto_apply_known_config_title">Автоматично застосовувати відому конфігурацію</string>
     <string name="settings_emulation_auto_apply_known_config_subtitle">Автоматично застосовувати рекомендовані налаштування для ігор Steam при першому запуску</string>
-	<string name="settings_emulation_fex_code_cache_title">Кеші коду FEX</string>
-	<string name="settings_emulation_fex_code_cache_subtitle">Діліться тим, який код переклав FEX, і завантажуйте готові переклади для швидшого запуску. Кеші займають місце в префіксі гри.</string>
+	<string name="settings_emulation_fex_code_map_upload_title">Надсилати карти коду FEX</string>
+	<string name="settings_emulation_fex_code_map_upload_subtitle">Надсилає відомості про те, які блоки коду виконуваних файлів гри виконувалися, без особистих даних. Зазвичай менше 1 МБ на гру.</string>
+	<string name="settings_emulation_fex_code_cache_use_title">Використовувати кеш коду FEX (експериментально)</string>
+	<string name="settings_emulation_fex_code_cache_use_subtitle">Може пришвидшити запуск і зменшити навантаження на процесор, може займати кілька сотень МБ на гру та додає додатковий крок під час запуску ігор</string>
     <string name="settings_emulation_box64_presets_title">Box64 Пресети</string>
     <string name="settings_emulation_box64_presets_subtitle">Перегляд, зміна та створення пресетів Box64</string>
     <string name="settings_emulation_driver_manager_title">Менеджер драйвера</string>
@@ -1241,17 +1245,15 @@
 
     <!-- Settings: Themes -->
     <string name="themes_title">Теми</string>
-    <string name="themes_manage">Керування темами</string>
-    <string name="themes_settings_subtitle">Встановлюйте та поєднуйте теми Steam Deck CSS Loader. Увімкнено: %1$d</string>
     <string name="themes_tab_installed">Встановлені</string>
-    <string name="themes_tab_steam_deck">Steam Deck</string>
+    <string name="themes_tab_steam_deck">У стилі SteamOS</string>
     <string name="themes_import_zip">Імпорт zip</string>
     <string name="themes_import_folder">Імпорт папки</string>
     <string name="themes_create_starter">Створити стартову тему</string>
     <string name="themes_empty">Тем ще не встановлено. Імпортуйте тему або відкрийте магазин.</string>
     <string name="themes_by_author">автор: %1$s</string>
     <string name="themes_changes">Змінює: %1$s</string>
-    <string name="themes_field_colours">кольори</string>
+    <string name="themes_field_colors">кольори</string>
     <string name="themes_field_corners">кути</string>
     <string name="themes_field_font">шрифт</string>
     <string name="themes_field_background">тло</string>
@@ -1268,6 +1270,8 @@
     <string name="themes_choose_image">Вибрати зображення</string>
     <string name="themes_clear_image">Очистити</string>
     <string name="themes_no_image">Немає зображення</string>
+    <string name="themes_choose_font">Вибрати шрифт</string>
+    <string name="themes_no_font">Немає шрифту</string>
     <string name="themes_hue">Відтінок</string>
     <string name="themes_saturation">Насиченість</string>
     <string name="themes_brightness">Яскравість</string>
@@ -1280,6 +1284,12 @@
     <string name="themes_load_more">Завантажити ще</string>
     <string name="themes_store_error">Не вдалося завантажити магазин тем: %1$s</string>
     <string name="themes_store_empty">Теми не знайдено</string>
+    <string name="themes_store_compat_note">Створені для SteamOS. GameNative адаптує ці теми, тому збіг зі знімками екрана перевірено лише в перевірених тем.</string>
+    <string name="themes_compat_verified">Перевірена</string>
+    <string name="themes_compat_incompatible">Несумісна</string>
+    <string name="themes_compat_incompatible_note">Ця тема змінює частини SteamOS, яких немає в GameNative.</string>
+    <string name="themes_compat_unverified">Не перевірена</string>
+    <string name="themes_compat_unverified_note">Може виглядати інакше, ніж на знімку екрана.</string>
     <string name="themes_retry">Повторити</string>
     <string name="themes_custom_subtitle">Виберіть власні кольори та макет</string>
     <string name="themes_field_effects">ефекти</string>
@@ -1324,7 +1334,7 @@
     <string name="themes_share_updated">Тему %1$s оновлено у списку спільноти</string>
     <string name="themes_shared_note">Опубліковано у спільноті</string>
     <string name="themes_share_blocked_title">Цією темою не можна поділитися</string>
-    <string name="themes_share_blocked_not_native">Ділитися можна лише темами, створеними на власних змінних GameNative, зокрема власною темою. Темами Steam Deck ділитися не можна.</string>
+    <string name="themes_share_blocked_not_native">Ділитися можна лише темами, створеними на власних змінних GameNative, зокрема власною темою. Темами в стилі SteamOS ділитися не можна.</string>
     <string name="themes_share_blocked_empty">Ця тема поки нічого не змінює. Спершу змініть кольори або параметри.</string>
     <string name="themes_share_blocked_too_large">Ця тема завелика, щоб нею поділитися.</string>
     <string name="themes_sign_in_title">Потрібен обліковий запис GameNative</string>
@@ -1480,7 +1490,7 @@
     <string name="main_recent_crash_title">Нещодавній збій</string>
     <string name="main_recent_crash_message">Перепрошуємо!\nБуло б добре дізнатися про проблему, з якою Ви нещодавно зіткнулися.\nВи можете переглянути та експортувати останній журнал збою в налаштуваннях застосунку і додати його як проблему (issue) на GitHub у репозиторії проєкту.\nПосилання на репозиторій GitHub також знаходиться в налаштуваннях!</string>
     <string name="main_thank_you_title">Подобається GameNative?</string>
-    <string name="main_thank_you_message">Станьте учасником сьогодні. Учасники отримують:\n\n• Допомогу ШІ із запуском ігор\n• Ранній доступ до нових версій\n• Преміум-ролі та ексклюзивні канали в Discord\n• …та інше\n\nВід $5/міс.</string>
+    <string name="main_thank_you_message">Станьте учасником сьогодні. Учасники отримують:\n\n• Оптимізація: ігри працюють краще, з налаштуванням під ваш пристрій і стиль гри\n• Допомогу ШІ із запуском ігор\n• Ранній доступ до нових збірок\n• Преміум-ролі та ексклюзивні канали в Discord\n• …та інше\n\nВід $5/міс.</string>
     <string name="main_join_kofi">Стати учасником</string>
     <string name="pitch_session_title">Подобається %1$s?</string>
     <string name="pitch_five_star_title">Раді, що %1$s чудово працює!</string>
@@ -1675,6 +1685,8 @@
     <string name="library_layout_capsule">Капсула</string>
     <string name="library_layout_hero">Герой</string>
     <string name="library_layout_carousel">Карусель</string>
+    <string name="library_layout_shelf">Полиця</string>
+    <string name="library_no_playtime">Ще не запускалася</string>
     <string name="library_search_placeholder">Шукати серед ваших ігор…</string>
     <string name="library_search_description">Пошук</string>
     <string name="library_search_clear">Очистити пошук</string>
@@ -1863,6 +1875,15 @@
     <string name="rockstar_preparing">Підготовка підтримки лаунчера Rockstar</string>
     <string name="rockstar_runtime_installing">Встановлення середовища Social Club</string>
     <string name="rockstar_installer_missing">У файлах гри відсутній інсталятор Social Club. Перевірте файли гри в Steam і спробуйте ще раз.</string>
+    <string name="ubisoft_preparing">Підготовка підтримки Ubisoft Connect</string>
+    <string name="ubisoft_runtime_installing">Завантаження файлів Ubisoft Connect із серверів Ubisoft</string>
+    <string name="ubisoft_login_required_title">Потрібен вхід в Ubisoft</string>
+    <string name="ubisoft_login_failed">Не вдалося увійти в Ubisoft: %1$s</string>
+    <string name="ubisoft_error_title">Ubisoft Connect</string>
+    <string name="ubisoft_error_session">Ubisoft не прийняв вхід. Вийдіть з Ubisoft у налаштуваннях і увійдіть знову.</string>
+    <string name="ubisoft_error_not_owned">У цьому обліковому записі Ubisoft немає гри, і копію зі Steam не вдалося до нього додати.</string>
+    <string name="ubisoft_error_activation">Ubisoft відмовився активувати цю гру.</string>
+    <string name="ubisoft_error_generic">Підтримка Ubisoft Connect зупинилася з помилкою %1$d.</string>
     <string name="gog_login_cancel">Скасувати</string>
     <string name="gog_settings_logout_title">Вийти з GOG</string>
     <string name="gog_settings_logout_subtitle">Вийти з облікового запису GOG</string>
@@ -2250,6 +2271,7 @@
     <string name="game_launch_tip_23">Порада: Якщо у вас GPU Mali, будь ласка, використовуйте системні драйвери.</string>
     <string name="game_launch_tip_24">Порада: Чорний екран? Спробуйте опцію \"%s\" у меню, щоб перевірити, чи ваші драйвери працюють правильно.</string>
     <string name="game_launch_tip_25">Порада: Використовуйте Proton x86-64, якщо вам не вдається клацнути мишею в іграх.</string>
+    <string name="launch_skip">Пропустити</string>
     <string name="launch_bionic_steam_description">Увімкнення онлайн-гри та покращення сумісності\nПрацює не завжди\nПеред спробою зробіть резервну копію збережень</string>
 
     <!-- Frontend Sync Settings -->

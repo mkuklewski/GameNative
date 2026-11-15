@@ -44,7 +44,7 @@ sealed interface ThemeOption {
         enum class Kind { DROPDOWN, CHECKBOX, SLIDER }
     }
 
-    /** Colour picker that belongs to a patch; shown only while [visible]. */
+    /** Color picker that belongs to a patch; shown only while [visible]. */
     data class Color(
         override val key: String,
         override val label: String,
@@ -59,6 +59,20 @@ sealed interface ThemeOption {
         val path: String?,
         val visible: Boolean = true,
     ) : ThemeOption
+
+    /** Font file picker that belongs to a patch; shown only while [visible]. */
+    data class Font(
+        override val key: String,
+        override val label: String,
+        val path: String?,
+        val visible: Boolean = true,
+    ) : ThemeOption
+
+    /** Heading of the options listed after it, up to the next heading. */
+    data class Section(
+        override val key: String,
+        override val label: String,
+    ) : ThemeOption
 }
 
 /** A theme listed by the online theme store. */
@@ -72,6 +86,7 @@ data class StoreTheme(
     val downloads: Int = 0,
     val previewImageUrl: String? = null,
     val downloadBlobId: String? = null,
+    val targets: List<String> = emptyList(),
 )
 
 /** A theme shared by a GameNative user. */

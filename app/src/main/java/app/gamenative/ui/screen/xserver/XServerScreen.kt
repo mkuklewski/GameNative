@@ -81,6 +81,7 @@ import app.gamenative.R
 import app.gamenative.optimize.OptimizeCards
 import app.gamenative.optimize.OptimizeController
 import app.gamenative.shadercache.FossilizeManager
+import app.gamenative.ui.theme.ThemedAlertDialog
 import app.gamenative.ui.util.applyScreenEffectsConfig
 import app.gamenative.ui.util.loadScreenEffectsConfig
 import androidx.core.content.ContextCompat
@@ -126,6 +127,8 @@ import app.gamenative.service.ea.EaLaunchSupport
 import app.gamenative.service.epic.EpicConstants
 import app.gamenative.service.rockstar.RockstarHelperDeployment
 import app.gamenative.service.rockstar.RockstarLaunchSupport
+import app.gamenative.service.ubisoft.UbisoftHelperDeployment
+import app.gamenative.service.ubisoft.UbisoftLaunchSupport
 import app.gamenative.service.epic.EpicOverlayManager
 import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGService
@@ -156,6 +159,7 @@ import app.gamenative.utils.GuestOutputTail
 import app.gamenative.utils.DebugRunParams
 import app.gamenative.utils.DebugRunParamsHolder
 import app.gamenative.utils.ExecutableSelectionUtils
+import app.gamenative.utils.FexCodeCaches
 import app.gamenative.utils.FexCodeMaps
 import app.gamenative.utils.LsfgQuickMenuHelper
 import app.gamenative.utils.LsfgVkManager
@@ -496,10 +500,27 @@ private val REAL_STEAM_PROCESSES = setOf(
     "steamhost32",
     "steamhost64",
     "eastub",
+    "upc",
+    "ubisoftgamelauncher",
+    "ubisoftgamelauncher64",
+    "conhost",
 )
 
 private var realSteamGameExecutable = ""
 private var realSteamRockstarDirectory: File? = null
+private var realSteamUbisoftDirectory: File? = null
+
+/** The launch entry's working directory for the stub, when that entry is the exe being launched. */
+private fun ubisoftWorkDir(launchInfo: LaunchInfo?, exePath: String, gameRootWindows: String): String? {
+    if (launchInfo == null) return null
+    val dir = launchInfo.workingDir.trim('/', '\\').takeIf { it.isNotEmpty() } ?: return null
+    val same = launchInfo.executable.replace('\\', '/').trim('/').equals(exePath.replace('\\', '/').trim('/'), ignoreCase = true)
+    return if (same) "$gameRootWindows\\" + dir.replace('/', '\\') else null
+}
+
+/** Bionic Steam starts the stand-in only when preLaunchApp staged its stub. */
+private fun usesUbisoftStandIn(appDir: File): Boolean =
+    UbisoftLaunchSupport.isUbisoftTitle(appDir) && UbisoftHelperDeployment.isDeployed(appDir)
 
 private fun buildEssentialProcessAllowlist(realSteam: Boolean): Set<String> {
     val essentialServices = WineUtils.getEssentialServiceNames()
@@ -1052,7 +1073,9 @@ fun XServerScreen(
     fun startExitWatchForUnmappedGameWindow(window: Window) {
         val winHandler = ui.xServerView?.getxServer()?.winHandler ?: return
         if (ui.exitWatchJob?.isActive == true) return
+        // The launch exe may be a patcher that exits early; the stub names the game it is following.
         val rockstarExecutable = realSteamRockstarDirectory?.let(RockstarHelperDeployment::gameExecutable)
+            ?: realSteamUbisoftDirectory?.let(UbisoftHelperDeployment::gameExecutable)
         val targetExecutable = extractExecutableBasename(
             rockstarExecutable ?: if (container.isLaunchRealSteam && realSteamGameExecutable.isNotEmpty()) realSteamGameExecutable else container.executablePath,
         )
@@ -3407,7 +3430,7 @@ fun XServerScreen(
 
     if (showPlayingBlockedDialog) {
         val remoteName = playingBlockedRemoteName ?: stringResource(R.string.main_app_running_unknown_game)
-        androidx.compose.material3.AlertDialog(
+        ThemedAlertDialog(
             onDismissRequest = {},
             title = { Text(text = stringResource(R.string.main_app_running_title)) },
             text = { Text(text = stringResource(R.string.main_app_running_message, remoteName)) },
@@ -4591,7 +4614,6 @@ private fun setupXEnvironment(
         envVars.remove("DXVK_FRAME_RATE")
         envVars.remove("VKD3D_FRAME_RATE")
         if (!envVars.has("WINEESYNC")) envVars.put("WINEESYNC", "1")
-        if (!envVars.has("_JAVA_OPTIONS")) envVars.put("_JAVA_OPTIONS", "-XX:+IgnoreUnrecognizedVMOptions -XX:+UnlockExperimentalVMOptions -XX:-UseZGC")
         if (debugRun) {
             DebugRunParamsHolder.get(appId)?.let { DebugRunParams.applyToDebugEnv(envVars, appId, it) }
             PerfSampler.armCpuProfile(DebugRunParamsHolder.get(appId)?.attach?.contains(DebugRunParams.ATTACH_CPU) == true)
@@ -4619,6 +4641,10 @@ private fun setupXEnvironment(
             guestProgramLauncherComponent.setFEXCorePreset(container.fexCorePreset)
         }
         guestProgramLauncherComponent.setPreUnpack {
+            // First: the launcher has just stopped every Wine process, and the steps below may start Wine again.
+            if (guestProgramLauncherComponent is BionicProgramLauncherComponent && !bootToContainer && !testGraphics) {
+                FexCodeCaches.buildBeforeLaunch(context, guestProgramLauncherComponent) { launchCancel.get() }
+            }
             unpackExecutableFile(
                 context = context,
                 needsUnpacking = container.isNeedsUnpacking,
@@ -4756,9 +4782,12 @@ private fun setupXEnvironment(
     }
 
     fun chainPreInstallSteps(remaining: List<PreInstallSteps.PreInstallCommand>) {
-        (guestProgramLauncherComponent as? BionicProgramLauncherComponent)?.setFEXCorePreset(
-            if (remaining.firstOrNull()?.marker.let { it == Marker.GOG_SCRIPT_INSTALLED || it == Marker.GOG_BONUS_INSTALLER_RUN }) FEXCorePreset.STABILITY else container.fexCorePreset,
-        )
+        (guestProgramLauncherComponent as? BionicProgramLauncherComponent)?.apply {
+            setFEXCorePreset(
+                if (remaining.firstOrNull()?.marker.let { it == Marker.GOG_SCRIPT_INSTALLED || it == Marker.GOG_BONUS_INSTALLER_RUN }) FEXCorePreset.STABILITY else container.fexCorePreset,
+            )
+            setGameStart(remaining.isEmpty())
+        }
         if (remaining.isEmpty()) {
             guestProgramLauncherComponent.setGuestExecutable(gameExecutable)
             guestProgramLauncherComponent.setTerminationCallback(gameTerminationCallback)
@@ -4959,6 +4988,7 @@ private fun getWineStartCommand(
     offline: Boolean
 ): String {
     realSteamRockstarDirectory = null
+    realSteamUbisoftDirectory = null
     val tempDir = File(container.getRootDir(), ".wine/drive_c/windows/temp")
     FileUtils.clear(tempDir)
 
@@ -5346,14 +5376,34 @@ private fun getWineStartCommand(
             // and will monitor the game via nativeWaitAppExit.
             val appDirPath = SteamService.getAppDirPath(gameId)
             val isRockstar = RockstarLaunchSupport.isRockstarTitle(File(appDirPath))
-            val exePath = if (isRockstar) RockstarHelperDeployment.executable(File(appDirPath)) else container.executablePath.ifEmpty { SteamService.getInstalledExe(gameId) }
+            val isUbisoft = usesUbisoftStandIn(File(appDirPath))
+            val originalExe by lazy { container.executablePath.ifEmpty { SteamService.getInstalledExe(gameId) } }
+            val exePath = when {
+                isRockstar -> RockstarHelperDeployment.executable(File(appDirPath))
+                isUbisoft -> UbisoftHelperDeployment.EXECUTABLE
+                else -> originalExe
+            }
             realSteamRockstarDirectory = if (isRockstar) File(appDirPath) else null
+            realSteamUbisoftDirectory = if (isUbisoft) File(appDirPath) else null
+            // The prefix pattern can be unpacked after the pre-launch step and replaces the registry files.
+            if (isUbisoft) UbisoftLaunchSupport.writeRegistry(container, File(appDirPath), UbisoftLaunchSupport.productId(context, gameId))
             val normalizedExe = exePath.replace('/', '\\').trimStart('\\')
-            val executableDir = appDirPath + "/" + exePath.substringBeforeLast("/", "")
+            // The stub starts the original exe itself, from that exe's folder.
+            val workExe = if (isUbisoft) originalExe else exePath
+            val executableDir = appDirPath + "/" + workExe.substringBeforeLast("/", "")
             guestProgramLauncherComponent.workingDir = File(executableDir)
             Timber.i("Bionic-Steam working directory is $executableDir")
             val gameFolderName = appDirPath.substringAfterLast('/').ifEmpty { gameId.toString() }
-            "\"C:\\\\Program Files (x86)\\\\Steam\\\\steamapps\\\\common\\\\$gameFolderName\\\\$normalizedExe\""
+            val stubArgs = if (isUbisoft) {
+                val gameRoot = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\$gameFolderName"
+                val original = "$gameRoot\\" + originalExe.replace('/', '\\').trimStart('\\')
+                val originalArgs = SteamUtils.launchConfigArguments(appLaunchInfo, originalExe)
+                " " + UbisoftHelperDeployment.stubArguments(original, originalArgs, ubisoftWorkDir(appLaunchInfo, originalExe, gameRoot))
+                    .replace("\\", "\\\\")
+            } else {
+                ""
+            }
+            "\"C:\\\\Program Files (x86)\\\\Steam\\\\steamapps\\\\common\\\\$gameFolderName\\\\$normalizedExe\"" + stubArgs
         } else if (container.isLaunchRealSteam && !container.isLaunchHeadlessSteam) {
             // Valve GUI client boots and starts the game itself
             "\"C:\\\\Program Files (x86)\\\\Steam\\\\steam.exe\" -silent -vgui -tcp " +
@@ -5366,9 +5416,13 @@ private fun getWineStartCommand(
             val isEaLaunch = EaLaunchSupport.isEaTitle(gameId, File(appDirPath))
             val isRockstar = RockstarLaunchSupport.isRockstarTitle(File(appDirPath))
             realSteamRockstarDirectory = if (isRockstar) File(appDirPath) else null
+            // The prefix pattern can be unpacked after the pre-launch step and replaces the registry files.
+            if (!isEaLaunch && UbisoftLaunchSupport.isUbisoftTitle(File(appDirPath))) {
+                UbisoftLaunchSupport.writeRegistry(container, File(appDirPath), UbisoftLaunchSupport.productId(context, gameId))
+            }
             val launchExe = if (isEaLaunch) "" else appLaunchInfo?.executable?.trim('/').orEmpty()
             val exePath = if (isRockstar) RockstarHelperDeployment.executable(File(appDirPath)) else container.executablePath.ifEmpty { launchExe.ifEmpty { SteamService.getInstalledExe(gameId) } }
-            val launchArgs = if (appLaunchInfo != null && exePath.replace('\\', '/').trim('/').equals(launchExe, ignoreCase = true)) appLaunchInfo.arguments.trim() else ""
+            val launchArgs = SteamUtils.launchConfigArguments(appLaunchInfo?.takeUnless { isEaLaunch }, exePath)
             val normalizedExe = exePath.replace('/', '\\').trimStart('\\')
             val gameFolderName = appDirPath.substringAfterLast('/').ifEmpty { gameId.toString() }
             val steamRoot = "C:\\Program Files (x86)\\Steam"
@@ -5560,7 +5614,11 @@ private fun exit(
     // had to kill loses only its unflushed tail. Ship what is on disk once the environment is down.
     (frameRating?.context ?: PluviaApp.xServerView?.context)?.applicationContext?.let { appContext ->
         val sessionLengthSec = frameRating?.sessionLengthSec?.toInt()
+        val sessionLauncher = app.gamenative.utils.FexCodeCaches.endSession(container)
         CoroutineScope(Dispatchers.IO).launch {
+            // Keeps this session's maps for the on-device compile before the upload deletes them; the compile runs on its own.
+            runCatching { app.gamenative.utils.FexCodeCaches.afterSession(appContext, container, sessionLauncher) }
+                .onFailure { Timber.w(it, "Code cache compile could not start") }
             runCatching { FexCodeMaps.uploadAfterSession(appContext, container, appId, sessionLengthSec) }
                 .onFailure { Timber.w(it, "Code map upload failed") }
         }

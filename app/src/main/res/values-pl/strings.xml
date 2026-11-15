@@ -1054,6 +1054,7 @@
     <string name="settings_performance_shared_shader_cache_subtitle">Udostępniaj innym graczom shadery zapisane podczas gry. Wyłączenie tej opcji zatrzymuje też pobieranie współdzielonej pamięci podręcznej ograniczającej przycięcia</string>
     <string name="shader_cache_preparing">Przygotowywanie shaderów…</string>
     <string name="shader_cache_preparing_progress">Przygotowywanie shaderów %1$d%%</string>
+    <string name="fex_code_cache_building">Tworzenie pamięci podręcznej kodu… (%1$d/%2$d)</string>
 
     <!-- Settings: Emulation Group -->
     <string name="settings_emulation_title">Emulacja</string>
@@ -1061,6 +1062,7 @@
     <string name="settings_accounts_signed_out">Niezalogowano</string>
     <string name="settings_accounts_ea_title">Konto EA</string>
     <string name="settings_accounts_rockstar_title">Konto Rockstar</string>
+    <string name="settings_accounts_ubisoft_title">Konto Ubisoft</string>
     <string name="gamenative_account_title">Konto GameNative</string>
     <string name="gamenative_account_sign_in">Zaloguj się</string>
     <string name="gamenative_account_sign_in_subtitle">Zaloguj się, aby zobaczyć swój plan i zarządzać subskrypcją.</string>
@@ -1162,10 +1164,10 @@
     <string name="support_checkout_no_browser">Nie znaleziono przeglądarki do otwarcia strony płatności. Zamiast tego zeskanuj kod innym urządzeniem.</string>
     <string name="support_checkout_failed">Nie udało się otworzyć strony płatności. Sprawdź połączenie i spróbuj ponownie.</string>
     <string name="support_checkout_done">Gotowe</string>
-    <string name="main_thank_you_message_play">Zostań członkiem już dziś. Członkowie otrzymują:\n\n• Pomoc AI w uruchamianiu gier\n• Wcześniejszy dostęp do nowych wydań\n• Role premium i ekskluzywne kanały na Discordzie\n• …i więcej\n\nOd %1$s/mies.</string>
+    <string name="main_thank_you_message_play">Zostań członkiem już dziś. Członkowie otrzymują:\n\n• Optymalizuj: gry działają lepiej, dostrojone do Twojego urządzenia i stylu gry\n• Pomoc AI w uruchamianiu gier\n• Wcześniejszy dostęp do nowych buildów\n• Role premium i ekskluzywne kanały na Discordzie\n• …i więcej\n\nOd %1$s/mies.</string>
     <string name="support_plan_pro_title_priced">%1$s/miesiąc · Pro</string>
     <string name="support_plan_basic_title_priced">%1$s/miesiąc · Basic</string>
-    <string name="membership_plans_pitch">Członkowie otrzymują pomoc AI w uruchamianiu gier, wcześniejszy dostęp do nowych wydań i role premium na Discordzie.</string>
+    <string name="membership_plans_pitch">Członkowie otrzymują Optymalizuj, który uczy się Twojego stylu gry, aby Twoje gry działały lepiej, pomoc AI w uruchamianiu gier i wcześniejszy dostęp do buildów.</string>
     <string name="membership_plans_title">Zostań członkiem</string>
     <string name="support_already_member">Masz już członkostwo? Zaloguj się</string>
     <string name="support_checkout_expired">Ta płatność wygasła. Jeśli już zapłaciłeś, zaloguj się użytym adresem e-mail, a plan się pojawi.</string>
@@ -1208,8 +1210,10 @@
     <string name="settings_emulation_default_config_dialog_title">Domyślna konfiguracja kontenera</string>
     <string name="settings_emulation_auto_apply_known_config_title">Automatycznie zastosuj znaną konfigurację</string>
     <string name="settings_emulation_auto_apply_known_config_subtitle">Automatycznie zastosuj zalecane ustawienia dla gier Steam przy pierwszym uruchomieniu</string>
-    <string name="settings_emulation_fex_code_cache_title">Pamięci podręczne kodu FEX</string>
-    <string name="settings_emulation_fex_code_cache_subtitle">Udostępniaj kod przetłumaczony przez FEX i pobieraj gotowe tłumaczenia dla szybszego uruchamiania. Pamięci podręczne zajmują miejsce w prefiksie gry.</string>
+    <string name="settings_emulation_fex_code_map_upload_title">Wysyłaj mapy kodu FEX</string>
+    <string name="settings_emulation_fex_code_map_upload_subtitle">Wysyła informacje, które bloki kodu plików wykonywalnych gry zostały uruchomione, bez danych osobowych. Zwykle mniej niż 1 MB na grę.</string>
+    <string name="settings_emulation_fex_code_cache_use_title">Używaj pamięci podręcznej kodu FEX (eksperymentalne)</string>
+    <string name="settings_emulation_fex_code_cache_use_subtitle">Może przyspieszyć uruchamianie i zmniejszyć użycie procesora, może zajmować kilkaset MB na grę i dodaje dodatkowy krok przy uruchamianiu gier</string>
     <string name="settings_emulation_box64_presets_title">Presety Box64</string>
     <string name="settings_emulation_box64_presets_subtitle">Przeglądaj, modyfikuj i twórz presety Box64</string>
     <string name="settings_emulation_driver_manager_title">Menedżer sterowników</string>
@@ -1257,17 +1261,15 @@
 
     <!-- Settings: Themes -->
     <string name="themes_title">Motywy</string>
-    <string name="themes_manage">Zarządzaj motywami</string>
-    <string name="themes_settings_subtitle">Instaluj i łącz motywy Steam Deck CSS Loader. Włączone: %1$d</string>
     <string name="themes_tab_installed">Zainstalowane</string>
-    <string name="themes_tab_steam_deck">Steam Deck</string>
+    <string name="themes_tab_steam_deck">W stylu SteamOS</string>
     <string name="themes_import_zip">Importuj zip</string>
     <string name="themes_import_folder">Importuj folder</string>
     <string name="themes_create_starter">Utwórz motyw startowy</string>
     <string name="themes_empty">Brak zainstalowanych motywów. Zaimportuj jeden lub przeglądaj sklep.</string>
     <string name="themes_by_author">autor: %1$s</string>
     <string name="themes_changes">Zmienia: %1$s</string>
-    <string name="themes_field_colours">kolory</string>
+    <string name="themes_field_colors">kolory</string>
     <string name="themes_field_corners">narożniki</string>
     <string name="themes_field_font">czcionkę</string>
     <string name="themes_field_background">tło</string>
@@ -1284,6 +1286,8 @@
     <string name="themes_choose_image">Wybierz obraz</string>
     <string name="themes_clear_image">Wyczyść</string>
     <string name="themes_no_image">Brak obrazu</string>
+    <string name="themes_choose_font">Wybierz czcionkę</string>
+    <string name="themes_no_font">Brak czcionki</string>
     <string name="themes_hue">Odcień</string>
     <string name="themes_saturation">Nasycenie</string>
     <string name="themes_brightness">Jasność</string>
@@ -1296,6 +1300,12 @@
     <string name="themes_load_more">Wczytaj więcej</string>
     <string name="themes_store_error">Nie udało się wczytać sklepu z motywami: %1$s</string>
     <string name="themes_store_empty">Nie znaleziono motywów</string>
+    <string name="themes_store_compat_note">Stworzone dla SteamOS. GameNative dostosowuje te motywy, więc tylko zweryfikowane zostały sprawdzone pod kątem wyglądu zgodnego ze zrzutami ekranu.</string>
+    <string name="themes_compat_verified">Zweryfikowany</string>
+    <string name="themes_compat_incompatible">Niezgodny</string>
+    <string name="themes_compat_incompatible_note">Ten motyw zmienia części SteamOS, których GameNative nie ma.</string>
+    <string name="themes_compat_unverified">Niezweryfikowany</string>
+    <string name="themes_compat_unverified_note">Może wyglądać inaczej niż na zrzucie ekranu.</string>
     <string name="themes_retry">Ponów</string>
     <string name="themes_custom_subtitle">Wybierz własne kolory i układ</string>
     <string name="themes_field_effects">efekty</string>
@@ -1340,7 +1350,7 @@
     <string name="themes_share_updated">Zaktualizowano %1$s na liście społeczności</string>
     <string name="themes_shared_note">Udostępniony społeczności</string>
     <string name="themes_share_blocked_title">Tego motywu nie można udostępnić</string>
-    <string name="themes_share_blocked_not_native">Udostępniać można tylko motywy utworzone z własnych zmiennych GameNative, w tym motyw własny. Motywów Steam Deck nie można udostępniać.</string>
+    <string name="themes_share_blocked_not_native">Udostępniać można tylko motywy utworzone z własnych zmiennych GameNative, w tym motyw własny. Motywów w stylu SteamOS nie można udostępniać.</string>
     <string name="themes_share_blocked_empty">Ten motyw jeszcze niczego nie zmienia. Najpierw zmień kilka kolorów lub opcji.</string>
     <string name="themes_share_blocked_too_large">Ten motyw jest za duży, aby go udostępnić.</string>
     <string name="themes_sign_in_title">Wymagane konto GameNative</string>
@@ -1496,7 +1506,7 @@
     <string name="main_recent_crash_title">Ostatnia awaria</string>
     <string name="main_recent_crash_message">Przykro nam!\nDobrze byłoby wiedzieć o ostatnim problemie, który wystąpił.\nMożesz zobaczyć i wyeksportować log ostatniej awarii w ustawieniach aplikacji i dołączyć go jako zgłoszenie w repozytorium projektu na Githubie.\nLink do repozytorium Github znajduje się również w ustawieniach!</string>
     <string name="main_thank_you_title">Podoba Ci się GameNative?</string>
-    <string name="main_thank_you_message">Zostań członkiem już dziś. Członkowie otrzymują:\n\n• Pomoc AI w uruchamianiu gier\n• Wcześniejszy dostęp do nowych wydań\n• Role premium i ekskluzywne kanały na Discordzie\n• …i więcej\n\nOd 5 $/mies.</string>
+    <string name="main_thank_you_message">Zostań członkiem już dziś. Członkowie otrzymują:\n\n• Optymalizuj: gry działają lepiej, dostrojone do Twojego urządzenia i stylu gry\n• Pomoc AI w uruchamianiu gier\n• Wcześniejszy dostęp do nowych buildów\n• Role premium i ekskluzywne kanały na Discordzie\n• …i więcej\n\nOd 5 $/mies.</string>
     <string name="main_join_kofi">Zostań członkiem</string>
     <string name="pitch_session_title">Podoba Ci się %1$s?</string>
     <string name="pitch_five_star_title">Świetnie, że %1$s działa doskonale!</string>
@@ -1691,6 +1701,8 @@
     <string name="library_layout_capsule">Kapsuła</string>
     <string name="library_layout_hero">Bohater</string>
     <string name="library_layout_carousel">Karuzela</string>
+    <string name="library_layout_shelf">Półka</string>
+    <string name="library_no_playtime">Brak czasu gry</string>
     <string name="library_search_placeholder">Szukaj gier…</string>
     <string name="library_search_description">Szukaj</string>
     <string name="library_search_clear">Wyczyść wyszukiwanie</string>
@@ -1879,6 +1891,15 @@
     <string name="rockstar_preparing">Przygotowywanie obsługi launchera Rockstar</string>
     <string name="rockstar_runtime_installing">Instalowanie środowiska Social Club</string>
     <string name="rockstar_installer_missing">W plikach gry brakuje instalatora Social Club. Zweryfikuj pliki gry w Steam i spróbuj ponownie.</string>
+    <string name="ubisoft_preparing">Przygotowywanie obsługi Ubisoft Connect</string>
+    <string name="ubisoft_runtime_installing">Pobieranie plików Ubisoft Connect od Ubisoft</string>
+    <string name="ubisoft_login_required_title">Wymagane logowanie do Ubisoft</string>
+    <string name="ubisoft_login_failed">Logowanie do Ubisoft nie powiodło się: %1$s</string>
+    <string name="ubisoft_error_title">Ubisoft Connect</string>
+    <string name="ubisoft_error_session">Ubisoft nie przyjął logowania. Wyloguj się z Ubisoft w Ustawieniach i zaloguj ponownie.</string>
+    <string name="ubisoft_error_not_owned">To konto Ubisoft nie ma gry, a kopii ze Steam nie udało się do niego dodać.</string>
+    <string name="ubisoft_error_activation">Ubisoft odmówił aktywacji tej gry.</string>
+    <string name="ubisoft_error_generic">Obsługa Ubisoft Connect zatrzymała się z błędem %1$d.</string>
     <string name="gog_login_cancel">Anuluj</string>
     <string name="gog_settings_logout_title">Wyloguj</string>
     <string name="gog_settings_logout_subtitle">Wyloguj się z konta GOG</string>
@@ -2256,6 +2277,7 @@
     <string name="game_launch_tip_23">Wskazówka: Jeśli masz GPU Mali, użyj sterowników systemowych.</string>
     <string name="game_launch_tip_24">Wskazówka: Czarny ekran? Wypróbuj opcję \"%s\" w menu, aby sprawdzić, czy sterowniki działają poprawnie.</string>
     <string name="game_launch_tip_25">Wskazówka: Użyj Proton x86-64, jeśli nie możesz kliknąć myszą w grach.</string>
+    <string name="launch_skip">Pomiń</string>
     <string name="launch_bionic_steam_description">Włącza grę online, poprawia kompatybilność\nNie zawsze działa\nPrzed użyciem wykonaj kopię zapasową zapisów</string>
 
     <!-- Frontend Sync Settings -->

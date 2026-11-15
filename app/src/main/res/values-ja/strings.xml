@@ -1208,6 +1208,7 @@
     <string name="settings_performance_shared_shader_cache_subtitle">プレイ中に記録したシェーダーを他のプレイヤーと共有します。オフにすると、カクつきを減らす共有キャッシュのダウンロードも行われません</string>
     <string name="shader_cache_preparing">シェーダーを準備中…</string>
     <string name="shader_cache_preparing_progress">シェーダーを準備中 %1$d%%</string>
+    <string name="fex_code_cache_building">コードキャッシュを構築中… (%1$d/%2$d)</string>
 
     <!-- Settings: Emulation Group -->
     <string name="settings_emulation_title">エミュレーション</string>
@@ -1215,6 +1216,7 @@
     <string name="settings_accounts_signed_out">サインインしていません</string>
     <string name="settings_accounts_ea_title">EA アカウント</string>
     <string name="settings_accounts_rockstar_title">Rockstar アカウント</string>
+    <string name="settings_accounts_ubisoft_title">Ubisoft アカウント</string>
     <string name="gamenative_account_title">GameNative アカウント</string>
     <string name="gamenative_account_sign_in">サインイン</string>
     <string name="gamenative_account_sign_in_subtitle">サインインすると、プランの確認とサブスクリプションの管理ができます。</string>
@@ -1321,7 +1323,7 @@
     <string name="support_checkout_expired">この購入手続きは期限切れです。すでに支払済みの場合は、使用したメールアドレスでサインインするとプランが表示されます。</string>
     <string name="support_already_member">すでにメンバーですか？サインイン</string>
     <string name="membership_plans_title">メンバーになる</string>
-    <string name="membership_plans_pitch">メンバーは、ゲームを動かすための AI サポート、新リリースへの早期アクセス、Discord のプレミアムロールを利用できます。</string>
+    <string name="membership_plans_pitch">メンバーは、プレイスタイルから学習してゲームをより快適に動かす最適化、ゲームを動かすための AI サポート、新しいビルドへの早期アクセスを利用できます。</string>
     <string name="support_already_subscribed">このアカウントにはすでにサブスクリプションがあります。プランは請求ページで変更できます。</string>
     <string name="support_plan_active">プランが有効になりました。</string>
     <string name="support_plan_pending">プランはまだ準備中です。1 分後にもう一度お試しください。</string>
@@ -1358,8 +1360,10 @@
     <string name="settings_emulation_default_config_dialog_title">デフォルトのコンテナ構成</string>
     <string name="settings_emulation_auto_apply_known_config_title">既知の構成を自動適用する</string>
     <string name="settings_emulation_auto_apply_known_config_subtitle">初回起動時に Steam ゲームの推奨設定を自動的に適用する</string>
-    <string name="settings_emulation_fex_code_cache_title">FEX コードキャッシュ</string>
-    <string name="settings_emulation_fex_code_cache_subtitle">FEX が変換したコードを共有し、ビルド済みの変換をダウンロードして起動を速くします。キャッシュはゲームのプレフィックスの容量を使います。</string>
+    <string name="settings_emulation_fex_code_map_upload_title">FEX コードマップをアップロード</string>
+    <string name="settings_emulation_fex_code_map_upload_subtitle">ゲームの実行ファイルのどのコードブロックが実行されたかを送信します。個人データは含まれません。通常は 1 ゲームあたり 1 MB 未満。</string>
+    <string name="settings_emulation_fex_code_cache_use_title">FEX コードキャッシュを使用 (実験的)</string>
+    <string name="settings_emulation_fex_code_cache_use_subtitle">起動を高速化し CPU 使用率を下げられる場合がありますが、1 ゲームあたり数百 MB を使用することがあり、ゲーム起動時に追加の手順が入ります</string>
     <string name="settings_emulation_box64_presets_title">Box64 プリセット</string>
     <string name="settings_emulation_box64_presets_subtitle">Box64 プリセットの表示、変更、作成</string>
     <string name="settings_emulation_driver_manager_title">ドライバーマネージャー</string>
@@ -1413,17 +1417,15 @@
 
     <!-- Settings: Themes -->
     <string name="themes_title">テーマ</string>
-    <string name="themes_manage">テーマを管理</string>
-    <string name="themes_settings_subtitle">Steam Deck CSS Loader のテーマをインストールして重ねて使えます。有効: %1$d</string>
     <string name="themes_tab_installed">インストール済み</string>
-    <string name="themes_tab_steam_deck">Steam Deck</string>
+    <string name="themes_tab_steam_deck">SteamOS 風</string>
     <string name="themes_import_zip">zip をインポート</string>
     <string name="themes_import_folder">フォルダをインポート</string>
     <string name="themes_create_starter">スターターテーマを作成</string>
     <string name="themes_empty">テーマはまだありません。インポートするかストアを探してください。</string>
     <string name="themes_by_author">作者: %1$s</string>
     <string name="themes_changes">変更: %1$s</string>
-    <string name="themes_field_colours">色</string>
+    <string name="themes_field_colors">色</string>
     <string name="themes_field_corners">角丸</string>
     <string name="themes_field_font">フォント</string>
     <string name="themes_field_background">背景</string>
@@ -1440,6 +1442,8 @@
     <string name="themes_choose_image">画像を選択</string>
     <string name="themes_clear_image">クリア</string>
     <string name="themes_no_image">画像なし</string>
+    <string name="themes_choose_font">フォントを選択</string>
+    <string name="themes_no_font">フォントなし</string>
     <string name="themes_hue">色相</string>
     <string name="themes_saturation">彩度</string>
     <string name="themes_brightness">明度</string>
@@ -1452,6 +1456,12 @@
     <string name="themes_load_more">さらに読み込む</string>
     <string name="themes_store_error">テーマストアを読み込めませんでした: %1$s</string>
     <string name="themes_store_empty">テーマが見つかりません</string>
+    <string name="themes_store_compat_note">SteamOS 向けに作られたテーマです。GameNative はこれらのテーマを調整して使うため、スクリーンショットどおりに見えることを確認しているのは確認済みのテーマだけです。</string>
+    <string name="themes_compat_verified">確認済み</string>
+    <string name="themes_compat_incompatible">非対応</string>
+    <string name="themes_compat_incompatible_note">このテーマは GameNative にない SteamOS の部分を変更します。</string>
+    <string name="themes_compat_unverified">未確認</string>
+    <string name="themes_compat_unverified_note">スクリーンショットと見た目が異なる場合があります。</string>
     <string name="themes_retry">再試行</string>
     <string name="themes_custom_subtitle">色とレイアウトを自分で選べます</string>
     <string name="themes_field_effects">エフェクト</string>
@@ -1496,7 +1506,7 @@
     <string name="themes_share_updated">コミュニティ一覧の %1$s を更新しました</string>
     <string name="themes_shared_note">コミュニティに共有済み</string>
     <string name="themes_share_blocked_title">このテーマは共有できません</string>
-    <string name="themes_share_blocked_not_native">共有できるのは、カスタムテーマを含め、GameNative 独自の変数で作られたテーマのみです。Steam Deck のテーマは共有できません。</string>
+    <string name="themes_share_blocked_not_native">共有できるのは、カスタムテーマを含め、GameNative 独自の変数で作られたテーマのみです。SteamOS 風のテーマは共有できません。</string>
     <string name="themes_share_blocked_empty">このテーマはまだ何も変更していません。先に色やオプションを変更してください。</string>
     <string name="themes_share_blocked_too_large">このテーマはサイズが大きすぎるため共有できません。</string>
     <string name="themes_sign_in_title">GameNative アカウントが必要です</string>
@@ -1710,8 +1720,8 @@
     <string name="main_recent_crash_title">最近のクラッシュ</string>
     <string name="main_recent_crash_message">申し訳ありません！\nお客様が遭遇した最近の問題について教えていただけると助かります。\nアプリの設定で最新のクラッシュログを表示・エクスポートし、プロジェクトのリポジトリに GitHub の issue として添付できます。\nGitHub リポジトリへのリンクも設定にあります！</string>
     <string name="main_thank_you_title">GameNativeを楽しんでいますか？</string>
-    <string name="main_thank_you_message_play">今すぐメンバーになりましょう。メンバー特典:\n\n• ゲームを動かすための AI サポート\n• 新リリースへの早期アクセス\n• Discordのプレミアムロールと限定チャンネル\n• …その他多数\n\n月額%1$sから</string>
-    <string name="main_thank_you_message">今すぐメンバーになりましょう。メンバー特典:\n\n• ゲームを動かすための AI サポート\n• 新リリースへの早期アクセス\n• Discordのプレミアムロールと限定チャンネル\n• …その他多数\n\n月額$5から</string>
+    <string name="main_thank_you_message_play">今すぐメンバーになりましょう。メンバー特典:\n\n• 最適化: 端末とプレイスタイルに合わせて調整し、ゲームがより快適に動作\n• ゲームを動かすための AI サポート\n• 新しいビルドへの早期アクセス\n• Discordのプレミアムロールと限定チャンネル\n• …その他多数\n\n月額%1$sから</string>
+    <string name="main_thank_you_message">今すぐメンバーになりましょう。メンバー特典:\n\n• 最適化: 端末とプレイスタイルに合わせて調整し、ゲームがより快適に動作\n• ゲームを動かすための AI サポート\n• 新しいビルドへの早期アクセス\n• Discordのプレミアムロールと限定チャンネル\n• …その他多数\n\n月額$5から</string>
     <string name="main_join_kofi">メンバーになる</string>
     <string name="pitch_session_title">%1$sを楽しんでいますか？</string>
     <string name="pitch_five_star_title">%1$sが快適に動いてよかったです！</string>
@@ -1921,6 +1931,8 @@
     <string name="library_layout_capsule">カプセル</string>
     <string name="library_layout_hero">ヒーロー</string>
     <string name="library_layout_carousel">カルーセル</string>
+    <string name="library_layout_shelf">シェルフ</string>
+    <string name="library_no_playtime">プレイ時間なし</string>
     <string name="library_search_placeholder">ゲームを検索してください…</string>
     <string name="library_search_description">検索</string>
     <string name="library_search_clear">検索をクリア</string>
@@ -2118,6 +2130,15 @@
     <string name="rockstar_preparing">Rockstar ランチャーのサポートを準備中</string>
     <string name="rockstar_runtime_installing">Social Club ランタイムをインストール中</string>
     <string name="rockstar_installer_missing">ゲームファイルに Social Club のインストーラーがありません。Steam でゲームファイルを検証してから、もう一度起動してください。</string>
+    <string name="ubisoft_preparing">Ubisoft Connect のサポートを準備しています</string>
+    <string name="ubisoft_runtime_installing">Ubisoft から Ubisoft Connect のファイルを取得しています</string>
+    <string name="ubisoft_login_required_title">Ubisoft へのサインインが必要です</string>
+    <string name="ubisoft_login_failed">Ubisoft へのサインインに失敗しました: %1$s</string>
+    <string name="ubisoft_error_title">Ubisoft Connect</string>
+    <string name="ubisoft_error_session">Ubisoft がサインインを受け付けませんでした。設定で Ubisoft からサインアウトし、もう一度サインインしてください。</string>
+    <string name="ubisoft_error_not_owned">この Ubisoft アカウントにはゲームがなく、Steam 版を追加できませんでした。</string>
+    <string name="ubisoft_error_activation">Ubisoft がこのゲームの有効化を拒否しました。</string>
+    <string name="ubisoft_error_generic">Ubisoft Connect のサポートがエラー %1$d で停止しました。</string>
     <string name="gog_login_cancel">キャンセル</string>
     <string name="gog_settings_logout_title">GOGからサインアウトする</string>
     <string name="gog_settings_logout_subtitle">GOG アカウントからサインアウトする</string>
@@ -3070,6 +3091,7 @@
     <string name="game_launch_tip_23">ヒント: Mali GPU をお持ちの場合は、システム ドライバーを使用してください。</string>
     <string name="game_launch_tip_24">ヒント: 空白の画面が表示されますか？メニューの \"%s\" オプションを使用して、ドライバーが正しく動作しているかどうかを確認してください。</string>
     <string name="game_launch_tip_25">ヒント: ゲームでマウスをクリックできない場合は、Proton x86-64 を使用してください。</string>
+    <string name="launch_skip">スキップ</string>
     <string name="local_mod_title">端末から MOD をインポート</string>
     <string name="local_mod_description">アーカイブ、フォルダー、または 1 つ以上の個別ファイルをインポートします。ローカルインポートでも、Nexus ダウンロードと同じプロファイル、配置、競合、FOMOD、プラグイン管理を使用します。</string>
     <string name="local_mod_supported">アーカイブ: ZIP、7Z、RAR、配置可能な EXE。個別ファイルは INI、DLL、ESP、ESM、ESL、PAK、JSON、CFG、TOML など、任意の拡張子を使用できます。</string>

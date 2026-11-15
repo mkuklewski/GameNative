@@ -84,6 +84,11 @@ import app.gamenative.service.rockstar.RockstarConstants
 import app.gamenative.service.rockstar.RockstarLoginGate
 import app.gamenative.service.rockstar.RockstarTitleMetadata
 import app.gamenative.service.rockstar.RockstarRuntime
+import app.gamenative.service.ubisoft.UbisoftExitOutcome
+import app.gamenative.service.ubisoft.UbisoftLaunchSupport
+import app.gamenative.service.ubisoft.UbisoftLoginGate
+import app.gamenative.service.ubisoft.UbisoftAuthManager
+import app.gamenative.service.ubisoft.UbisoftConstants
 import app.gamenative.service.amazon.AmazonService
 import app.gamenative.theme.ThemeManager
 import app.gamenative.utils.ConversionTracker
@@ -154,6 +159,7 @@ import app.gamenative.utils.UpdateChecker
 import app.gamenative.utils.UpdateInfo
 import app.gamenative.utils.UpdateInstaller
 import app.gamenative.utils.LaunchDependencies
+import app.gamenative.utils.LaunchSkip
 import app.gamenative.workshop.WorkshopManager
 import app.gamenative.workshop.compatibility.SlayTheSpireModTheSpireCompatibility
 import com.google.android.play.core.splitcompat.SplitCompat
@@ -186,6 +192,9 @@ import timber.log.Timber
 private const val PENDING_LAUNCH_TIMEOUT_MS = 10_000L
 private const val SNACKBAR_SHOW_TIMEOUT_MS = 15_000L
 
+/** Live offline flag of the Home entry; starts from its `offline` argument. */
+private const val HOME_OFFLINE_STATE_KEY = "home_offline"
+
 /** Used to suspend preLaunchApp while the user decides on large workshop updates. */
 private var workshopUpdateDeferred: CompletableDeferred<Boolean>? = null
 
@@ -194,6 +203,9 @@ private var steamUpdateDeferred: CompletableDeferred<Boolean>? = null
 
 /** Valve Windows client tree (build 1788652215, 2026-09-03) + headless steam.exe for Real Steam mode; see extractSteamFiles. */
 const val REAL_STEAM_CLIENT_ARCHIVE = "steamhost-20261029.tzst"
+
+/** gbe_fork release-2026_09_27 experimental steamclient + ColdClientLoader, plus StubDRM64; see SteamUtils.replaceSteamclientDll. */
+const val STEAM_EMULATOR_ARCHIVE = "experimental-drm-20261029.tzst"
 
 private fun NavHostController.navigateFromLoginIfNeeded(
     targetRoute: String,
@@ -401,6 +413,34 @@ private fun startDebugRun(
         isOffline = isOffline,
         bootToContainer = false,
     )
+}
+
+/** Starts the game again after the Ubisoft stand-in asked for a new session. */
+private fun relaunchUbisoft(
+    context: Context,
+    viewModel: MainViewModel,
+    appId: String,
+    setMessageDialogState: (MessageDialogState) -> Unit,
+) {
+    viewModel.setLaunchedAppId(appId)
+    viewModel.setBootToContainer(false)
+    preLaunchApp(
+        context = context,
+        appId = appId,
+        setLoadingDialogVisible = viewModel::setLoadingDialogVisible,
+        setLoadingProgress = viewModel::setLoadingDialogProgress,
+        setLoadingMessage = viewModel::setLoadingDialogMessage,
+        setMessageDialogState = setMessageDialogState,
+        onSuccess = viewModel::launchApp,
+        isOffline = viewModel.isOffline.value,
+    )
+}
+
+private fun ubisoftErrorMessage(context: Context, outcome: UbisoftExitOutcome): String = when {
+    outcome !is UbisoftExitOutcome.Failed -> context.getString(R.string.ubisoft_error_session)
+    outcome.exitCode == UbisoftConstants.EXIT_NOT_OWNED -> context.getString(R.string.ubisoft_error_not_owned)
+    outcome.exitCode == UbisoftConstants.EXIT_ACTIVATION_REFUSED -> context.getString(R.string.ubisoft_error_activation)
+    else -> context.getString(R.string.ubisoft_error_generic, outcome.exitCode)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -737,14 +777,14 @@ fun PluviaMain(
                                 if (currentRoute == PluviaScreen.LoginUser.route) {
                                     navController.navigateFromLoginIfNeeded(targetRoute, "LogonEnded")
                                 } else if (currentRoute == PluviaScreen.Home.route + "?offline={offline}") {
-                                    val isCurrentlyOffline = navController.currentBackStackEntry
-                                        ?.arguments?.getBoolean("offline") ?: false
+                                    // Go online in place: re-navigating would rebuild Home and
+                                    // flash the library back to its loading state.
+                                    val homeEntry = navController.currentBackStackEntry
+                                    val isCurrentlyOffline = homeEntry?.savedStateHandle?.get<Boolean>(HOME_OFFLINE_STATE_KEY)
+                                        ?: homeEntry?.arguments?.getBoolean("offline")
+                                        ?: false
                                     if (isCurrentlyOffline) {
-                                        navController.navigate(PluviaScreen.Home.route + "?offline=false") {
-                                            popUpTo(PluviaScreen.Home.route + "?offline={offline}") {
-                                                inclusive = true
-                                            }
-                                        }
+                                        homeEntry?.savedStateHandle?.set(HOME_OFFLINE_STATE_KEY, false)
                                     }
                                 }
                             }
@@ -839,6 +879,27 @@ fun PluviaMain(
                         trackAiDebug(
                             "ai_debug_report_shown",
                             mapOf("discord_linked" to PrefManager.discordRelayTokenPresent.value),
+                        )
+                    }
+                }
+
+                is MainViewModel.MainUiEvent.UbisoftExit -> {
+                    val outcome = event.outcome
+                    if (outcome !is UbisoftExitOutcome.Failed &&
+                        UbisoftLaunchSupport.shouldRetrySignIn(ContainerUtils.extractGameIdFromContainerId(event.appId))
+                    ) {
+                        if (outcome == UbisoftExitOutcome.SessionRejected) {
+                            Timber.i("Ubisoft session refused by the launcher, signing in again")
+                            withContext(Dispatchers.IO) { UbisoftAuthManager.logout(context) }
+                        }
+                        relaunchUbisoft(context, viewModel, event.appId, setMessageDialogState)
+                    } else {
+                        msgDialogState = MessageDialogState(
+                            visible = true,
+                            type = DialogType.SYNC_FAIL,
+                            title = context.getString(R.string.ubisoft_error_title),
+                            message = ubisoftErrorMessage(context, outcome),
+                            dismissBtnText = context.getString(R.string.ok),
                         )
                     }
                 }
@@ -1483,6 +1544,9 @@ fun PluviaMain(
     }
 
     UiSoundLifecycle(gameRunning = state.currentScreen == PluviaScreen.XServer)
+    LaunchedEffect(state.currentScreen == PluviaScreen.XServer) {
+        ThemeManager.setGameRunning(state.currentScreen == PluviaScreen.XServer)
+    }
     SupportReplyEffects(
         gameRunning = state.currentScreen == PluviaScreen.XServer,
         canOpenSupport = state.currentScreen == PluviaScreen.Home ||
@@ -1515,6 +1579,7 @@ fun PluviaMain(
                 visible = state.loadingDialogVisible,
                 progress = state.loadingDialogProgress,
                 message = state.loadingDialogMessage,
+                onSkip = LaunchSkip.action.collectAsStateWithLifecycle().value,
             )
 
             MessageDialog(
@@ -2050,11 +2115,16 @@ fun PluviaMain(
                         },
                     ),
                 ) { backStackEntry ->
-                    val isOffline = backStackEntry.arguments?.getBoolean("offline") ?: false
+                    val offlineArg = backStackEntry.arguments?.getBoolean("offline") ?: false
+                    // Steam signing in flips this in place (see OnLogonEnded), so the library
+                    // keeps its view model, list, scroll and focus instead of being rebuilt.
+                    val isOffline by backStackEntry.savedStateHandle
+                        .getStateFlow(HOME_OFFLINE_STATE_KEY, offlineArg)
+                        .collectAsStateWithLifecycle()
 
                     // Show update/crash/support dialogs when Home is first displayed
                     // Skip when offline with Steam credentials (avoid flash when Steam reconnects)
-                    LaunchedEffect(Unit) {
+                    LaunchedEffect(isOffline) {
                         val shouldShowDialogs = !isOffline || !SteamUtils.hasStoredCredentials()
 
                         if (shouldShowDialogs && !state.annoyingDialogShown && PluviaApp.xEnvironment == null && !SteamService.keepAlive && !MainActivity.wasLaunchedViaExternalIntent) {
@@ -2230,8 +2300,10 @@ fun PluviaMain(
                     if (!hasContainer) {
                         LaunchedEffect(launchedAppId) {
                             Timber.w("XServer route entered without a container for '$launchedAppId', returning home")
-                            navController.navigate(PluviaScreen.Home.route + "?offline=$xServerIsOffline") {
-                                popUpTo(PluviaScreen.XServer.route) { inclusive = true }
+                            if (!navController.popBackStack()) {
+                                navController.navigate(PluviaScreen.Home.route + "?offline=$xServerIsOffline") {
+                                    popUpTo(PluviaScreen.XServer.route) { inclusive = true }
+                                }
                             }
                         }
                         return@composable
@@ -2562,14 +2634,14 @@ fun preLaunchApp(
             }
 
             if (!container.isUseLegacyDRM && !container.isLaunchRealSteam &&
-                !SteamService.isFileInstallable(context, "experimental-drm-20260116.tzst")
+                !SteamService.isFileInstallable(context, STEAM_EMULATOR_ARCHIVE)
             ) {
                 setLoadingMessage("Downloading extras")
                 SteamService.downloadFile(
                     onDownloadProgress = { setLoadingProgress(it / 1.0f) },
                     this,
                     context = context,
-                    "experimental-drm-20260116.tzst",
+                    STEAM_EMULATOR_ARCHIVE,
                 ).await()
             }
             if (gameSource == GameSource.STEAM && container.isLaunchRealSteam && !isOffline && !container.isSteamOfflineMode &&
@@ -2696,6 +2768,30 @@ fun preLaunchApp(
                         "Could not place Rockstar sign-in credentials in the game directory"
                     }
                     RockstarHelperDeployment.prepare(context.filesDir, rockstarGameDir)
+                }
+            }
+            // Games that ship a Ubisoft Connect loader run against the stand-in; the helper archive and runtime are launch dependencies.
+            val ubisoftGameDir = if (gameSource == GameSource.STEAM) File(SteamService.getAppDirPath(gameId)) else null
+            if (ubisoftGameDir != null && UbisoftLaunchSupport.servesLaunch(container, ubisoftGameDir)) {
+                setLoadingMessage(context.getString(R.string.ubisoft_preparing))
+                val signIn = UbisoftLoginGate.ensureSignedIn(context)
+                if (signIn.isFailure) {
+                    Timber.tag("preLaunchApp").w(signIn.exceptionOrNull(), "Ubisoft sign-in did not complete")
+                    setLoadingDialogVisible(false)
+                    setMessageDialogState(
+                        MessageDialogState(
+                            visible = true,
+                            type = DialogType.SYNC_FAIL,
+                            title = context.getString(R.string.ubisoft_login_required_title),
+                            message = context.getString(R.string.ubisoft_login_failed, signIn.exceptionOrNull()?.message ?: ""),
+                            dismissBtnText = context.getString(R.string.ok),
+                        ),
+                    )
+                    return@launch
+                }
+                setLoadingMessage(context.getString(R.string.ubisoft_runtime_installing))
+                withContext(Dispatchers.IO) {
+                    UbisoftLaunchSupport.prepare(context, container, gameId, ubisoftGameDir) { setLoadingProgress(it) }
                 }
             }
             if ((container.isLaunchBionicSteam || (container.isLaunchRealSteam && !container.isLaunchHeadlessSteam)) &&

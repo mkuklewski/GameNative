@@ -1035,6 +1035,7 @@
     <string name="settings_performance_shared_shader_cache_subtitle">Condividi con gli altri giocatori gli shader registrati mentre giochi. Disattivandolo non vengono nemmeno scaricate le cache condivise che riducono gli scatti</string>
     <string name="shader_cache_preparing">Preparazione degli shader…</string>
     <string name="shader_cache_preparing_progress">Preparazione degli shader %1$d%%</string>
+    <string name="fex_code_cache_building">Creazione della cache del codice… (%1$d/%2$d)</string>
 
     <!-- Settings: Emulation Group -->
     <string name="settings_emulation_title">Emulazione</string>
@@ -1042,6 +1043,7 @@
     <string name="settings_accounts_signed_out">Non connesso</string>
     <string name="settings_accounts_ea_title">Account EA</string>
     <string name="settings_accounts_rockstar_title">Account Rockstar</string>
+    <string name="settings_accounts_ubisoft_title">Account Ubisoft</string>
     <string name="gamenative_account_title">Account GameNative</string>
     <string name="gamenative_account_sign_in">Accedi</string>
     <string name="gamenative_account_sign_in_subtitle">Accedi per vedere il tuo piano e gestire l\'abbonamento.</string>
@@ -1141,10 +1143,10 @@
     <string name="support_checkout_no_browser">Non è stato trovato alcun browser per aprire la pagina di pagamento. Scansiona il codice con un altro dispositivo.</string>
     <string name="support_checkout_failed">Non è stato possibile aprire la pagina di pagamento. Controlla la connessione e riprova.</string>
     <string name="support_checkout_done">Fatto</string>
-    <string name="main_thank_you_message_play">Diventa membro oggi. I membri ottengono:\n\n• Aiuto con IA per far funzionare i tuoi giochi\n• Accesso anticipato alle nuove versioni\n• Ruoli premium e canali esclusivi su Discord\n• …e altro ancora\n\nDa %1$s/mese</string>
+    <string name="main_thank_you_message_play">Diventa membro oggi. I membri ottengono:\n\n• Ottimizza: giochi che girano meglio, regolati sul tuo dispositivo e stile di gioco\n• Aiuto con IA per far funzionare i tuoi giochi\n• Accesso anticipato alle nuove build\n• Ruoli premium e canali esclusivi su Discord\n• …e altro ancora\n\nDa %1$s/mese</string>
     <string name="support_plan_pro_title_priced">%1$s/mese · Pro</string>
     <string name="support_plan_basic_title_priced">%1$s/mese · Basic</string>
-    <string name="membership_plans_pitch">I membri ottengono aiuto con IA per far funzionare i giochi, accesso anticipato alle nuove versioni e ruoli premium su Discord.</string>
+    <string name="membership_plans_pitch">I membri ottengono Ottimizza, che impara dal tuo stile di gioco per far girare meglio i tuoi giochi, aiuto con IA per far funzionare i tuoi giochi e accesso anticipato alle build.</string>
     <string name="membership_plans_title">Diventa membro</string>
     <string name="support_already_member">Sei già membro? Accedi</string>
     <string name="support_checkout_expired">Questo pagamento è scaduto. Se hai già pagato, accedi con l\'e-mail usata e il tuo piano comparirà.</string>
@@ -1187,8 +1189,10 @@
     <string name="settings_emulation_default_config_dialog_title">Config Container Predefinita</string>
     <string name="settings_emulation_auto_apply_known_config_title">Applica automaticamente config nota</string>
     <string name="settings_emulation_auto_apply_known_config_subtitle">Applica automaticamente le impostazioni consigliate per i giochi Steam al primo avvio</string>
-    <string name="settings_emulation_fex_code_cache_title">Cache di codice FEX</string>
-    <string name="settings_emulation_fex_code_cache_subtitle">Condividi quale codice FEX ha tradotto e scarica traduzioni precompilate per avvii più rapidi. Le cache occupano spazio nel prefisso del gioco.</string>
+    <string name="settings_emulation_fex_code_map_upload_title">Carica le mappe di codice FEX</string>
+    <string name="settings_emulation_fex_code_map_upload_subtitle">Invia quali blocchi di codice degli eseguibili di un gioco sono stati eseguiti, nessun dato personale. Di solito meno di 1 MB per gioco.</string>
+    <string name="settings_emulation_fex_code_cache_use_title">Usa le cache di codice FEX (sperimentale)</string>
+    <string name="settings_emulation_fex_code_cache_use_subtitle">Può velocizzare gli avvii e ridurre l\'uso della CPU, può occupare qualche centinaio di MB per gioco e aggiunge un passaggio in più all\'avvio dei giochi</string>
     <string name="settings_emulation_box64_presets_title">Preset Box64</string>
     <string name="settings_emulation_box64_presets_subtitle">Visualizza, modifica e crea preset Box64</string>
     <string name="settings_emulation_driver_manager_title">Gestione Driver</string>
@@ -1236,17 +1240,15 @@
 
     <!-- Settings: Themes -->
     <string name="themes_title">Temi</string>
-    <string name="themes_manage">Gestisci temi</string>
-    <string name="themes_settings_subtitle">Installa e combina temi di Steam Deck CSS Loader. Attivi: %1$d</string>
     <string name="themes_tab_installed">Installati</string>
-    <string name="themes_tab_steam_deck">Steam Deck</string>
+    <string name="themes_tab_steam_deck">Stile SteamOS</string>
     <string name="themes_import_zip">Importa zip</string>
     <string name="themes_import_folder">Importa cartella</string>
     <string name="themes_create_starter">Crea tema di base</string>
     <string name="themes_empty">Nessun tema installato. Importane uno o sfoglia lo store.</string>
     <string name="themes_by_author">di %1$s</string>
     <string name="themes_changes">Modifica: %1$s</string>
-    <string name="themes_field_colours">colori</string>
+    <string name="themes_field_colors">colori</string>
     <string name="themes_field_corners">angoli</string>
     <string name="themes_field_font">carattere</string>
     <string name="themes_field_background">sfondo</string>
@@ -1263,6 +1265,8 @@
     <string name="themes_choose_image">Scegli immagine</string>
     <string name="themes_clear_image">Rimuovi</string>
     <string name="themes_no_image">Nessuna immagine</string>
+    <string name="themes_choose_font">Scegli carattere</string>
+    <string name="themes_no_font">Nessun carattere</string>
     <string name="themes_hue">Tonalità</string>
     <string name="themes_saturation">Saturazione</string>
     <string name="themes_brightness">Luminosità</string>
@@ -1275,6 +1279,12 @@
     <string name="themes_load_more">Carica altri</string>
     <string name="themes_store_error">Impossibile caricare lo store dei temi: %1$s</string>
     <string name="themes_store_empty">Nessun tema trovato</string>
+    <string name="themes_store_compat_note">Creati per SteamOS. GameNative adatta questi temi, quindi solo quelli verificati sono controllati per somigliare ai loro screenshot.</string>
+    <string name="themes_compat_verified">Verificato</string>
+    <string name="themes_compat_incompatible">Non compatibile</string>
+    <string name="themes_compat_incompatible_note">Questo tema modifica parti di SteamOS che GameNative non ha.</string>
+    <string name="themes_compat_unverified">Non verificato</string>
+    <string name="themes_compat_unverified_note">Potrebbe apparire diverso dallo screenshot.</string>
     <string name="themes_retry">Riprova</string>
     <string name="themes_custom_subtitle">Scegli i tuoi colori e il tuo layout</string>
     <string name="themes_field_effects">effetti</string>
@@ -1319,7 +1329,7 @@
     <string name="themes_share_updated">%1$s aggiornato nell\'elenco della community</string>
     <string name="themes_shared_note">Condiviso con la community</string>
     <string name="themes_share_blocked_title">Questo tema non può essere condiviso</string>
-    <string name="themes_share_blocked_not_native">Si possono condividere solo i temi creati con le variabili di GameNative, compreso il tema personalizzato. I temi di Steam Deck non possono essere condivisi.</string>
+    <string name="themes_share_blocked_not_native">Si possono condividere solo i temi creati con le variabili di GameNative, compreso il tema personalizzato. I temi in stile SteamOS non possono essere condivisi.</string>
     <string name="themes_share_blocked_empty">Questo tema non cambia ancora nulla. Modifica prima qualche colore o opzione.</string>
     <string name="themes_share_blocked_too_large">Questo tema è troppo grande per essere condiviso.</string>
     <string name="themes_sign_in_title">Serve un account GameNative</string>
@@ -1473,7 +1483,7 @@
     <string name="main_recent_crash_title">Crash Recente</string>
     <string name="main_recent_crash_message">Ci dispiace!\nSarebbe utile conoscere il problema recente che hai avuto.\nPuoi visualizzare ed esportare il log del crash più recente nelle impostazioni dell\'app e allegarlo come issue GitHub nel repository del progetto.\nIl link al repository Github è anche nelle impostazioni!</string>
     <string name="main_thank_you_title">Ti piace GameNative?</string>
-    <string name="main_thank_you_message">Diventa membro oggi. I membri ottengono:\n\n• Aiuto con IA per far funzionare i tuoi giochi\n• Accesso anticipato alle nuove versioni\n• Ruoli premium e canali esclusivi su Discord\n• …e altro ancora\n\nDa $5/mese</string>
+    <string name="main_thank_you_message">Diventa membro oggi. I membri ottengono:\n\n• Ottimizza: giochi che girano meglio, regolati sul tuo dispositivo e stile di gioco\n• Aiuto con IA per far funzionare i tuoi giochi\n• Accesso anticipato alle nuove build\n• Ruoli premium e canali esclusivi su Discord\n• …e altro ancora\n\nDa $5/mese</string>
     <string name="main_join_kofi">Diventa membro</string>
     <string name="pitch_session_title">Ti stai divertendo con %1$s?</string>
     <string name="pitch_five_star_title">Bello che %1$s abbia funzionato alla grande!</string>
@@ -1666,6 +1676,8 @@
     <string name="library_layout_capsule">Capsula</string>
     <string name="library_layout_hero">Eroe</string>
     <string name="library_layout_carousel">Carosello</string>
+    <string name="library_layout_shelf">Scaffale</string>
+    <string name="library_no_playtime">Nessun tempo di gioco</string>
     <string name="library_search_placeholder">Cerca i tuoi giochi…</string>
     <string name="library_search_description">Cerca</string>
     <string name="library_search_clear">Cancella ricerca</string>
@@ -1854,6 +1866,15 @@
     <string name="rockstar_preparing">Preparazione del supporto per il launcher Rockstar</string>
     <string name="rockstar_runtime_installing">Installazione del runtime Social Club</string>
     <string name="rockstar_installer_missing">L\'installer di Social Club manca nei file del gioco. Verifica i file del gioco in Steam e riprova.</string>
+    <string name="ubisoft_preparing">Preparazione del supporto a Ubisoft Connect</string>
+    <string name="ubisoft_runtime_installing">Download dei file di Ubisoft Connect da Ubisoft</string>
+    <string name="ubisoft_login_required_title">Accesso Ubisoft richiesto</string>
+    <string name="ubisoft_login_failed">Accesso Ubisoft non riuscito: %1$s</string>
+    <string name="ubisoft_error_title">Ubisoft Connect</string>
+    <string name="ubisoft_error_session">Ubisoft non ha accettato l\'accesso. Esci da Ubisoft nelle Impostazioni e accedi di nuovo.</string>
+    <string name="ubisoft_error_not_owned">Questo account Ubisoft non ha il gioco e non è stato possibile aggiungervi la copia di Steam.</string>
+    <string name="ubisoft_error_activation">Ubisoft ha rifiutato di attivare questo gioco.</string>
+    <string name="ubisoft_error_generic">Il supporto a Ubisoft Connect si è interrotto con l\'errore %1$d.</string>
     <string name="gog_login_cancel">Annulla</string>
     <string name="gog_settings_logout_title">Esci da GOG</string>
     <string name="gog_settings_logout_subtitle">Disconnettiti dal tuo account GOG</string>
@@ -2217,6 +2238,7 @@
     <string name="game_launch_tip_23">Suggerimento: se hai una GPU Mali, utilizza i driver di sistema.</string>
     <string name="game_launch_tip_24">Suggerimento: schermata nera? Prova l\'opzione \"%s\" nel menu per verificare se i tuoi driver funzionano correttamente.</string>
     <string name="game_launch_tip_25">Suggerimento: usa Proton x86-64 se non riesci a cliccare con il mouse nei giochi.</string>
+    <string name="launch_skip">Salta</string>
     <string name="launch_bionic_steam_description">Abilita il gioco online e migliora la compatibilità\nNon sempre funziona\nEsegui un backup dei salvataggi prima di provarlo</string>
 
     <!-- Frontend Sync Settings -->

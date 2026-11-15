@@ -6,13 +6,15 @@ import app.gamenative.data.GameSource
 import app.gamenative.utils.launchdependencies.BionicDefaultProtonDependency
 import app.gamenative.utils.launchdependencies.EpicOverlayDependency
 import app.gamenative.utils.launchdependencies.EpicSdkRestoreDependency
-import app.gamenative.utils.launchdependencies.FexCodeCacheDependency
 import app.gamenative.utils.launchdependencies.GogScriptInterpreterDependency
 import app.gamenative.utils.launchdependencies.LaunchDependencyCallbacks
 import app.gamenative.utils.launchdependencies.LaunchDependency
 import app.gamenative.utils.launchdependencies.BionicSteamAssetsDependency
 import app.gamenative.utils.launchdependencies.RockstarHelperDependency
+import app.gamenative.utils.launchdependencies.UbisoftHelperDependency
 import com.winlator.container.Container
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 const val LOADING_PROGRESS_UNKNOWN: Float = -1f
 
@@ -30,7 +32,7 @@ class LaunchDependencies {
             EpicSdkRestoreDependency,
             BionicSteamAssetsDependency,
             RockstarHelperDependency,
-            FexCodeCacheDependency,
+            UbisoftHelperDependency,
         )
 
         private var dependenciesProvider: () -> List<LaunchDependency> = { launchDependencies }
@@ -47,6 +49,8 @@ class LaunchDependencies {
         setLoadingMessage: (String) -> Unit,
         setLoadingProgress: (Float) -> Unit,
     ) {
+        // An on-device code cache compile from the last session must not compete with this launch.
+        withContext(Dispatchers.IO) { FexCodeCaches.stopForLaunch("a launch was requested") }
         val callbacks = LaunchDependencyCallbacks(setLoadingMessage, setLoadingProgress)
         try {
             for (dep in getLaunchDependencies(container, gameSource, gameId)) {

@@ -22,24 +22,28 @@ object CommunityThemePackage {
     private val FONT_EXT = setOf("ttf", "otf")
     private val IMAGE_EXT = setOf("png", "jpg", "jpeg", "webp")
 
-    /** True when [sheet] has only `:root { --gn-* }` rules and `@font-face`, with urls to local files. */
+    /**
+     * True when [sheet] has only `:root { --gn-* }` rules and `@font-face`, with urls to local files. Fonts may also come
+     * from HTTPS urls and HTTPS `@import`s: they are downloaded with the theme and packaged as its font file.
+     */
     fun isNative(sheet: CssSheet): Boolean {
-        if (sheet.keyframes.isNotEmpty() || sheet.imports.isNotEmpty()) return false
+        if (sheet.keyframes.isNotEmpty()) return false
+        if (!sheet.imports.all { RemoteFonts.importUrl(it)?.let(RemoteFonts::isHttps) == true }) return false
         for (r in sheet.rules) {
             if (r.selectors.any { it.trim() != ":root" }) return false
-            for (d in r.decls) if (!d.property.startsWith("--gn-") || !localUrls(d.value)) return false
+            for (d in r.decls) if (!d.property.startsWith("--gn-") || !localUrls(d.value, remote = d.property == "--gn-font")) return false
         }
-        return sheet.fontFaces.all { ff -> ff.all { localUrls(it.value) } }
+        return sheet.fontFaces.all { ff -> ff.all { localUrls(it.value, remote = true) } }
     }
 
-    /** Relative paths, the loader's `/themes_custom/` folder path and `file:` paths it writes for picked images. */
-    private fun localUrls(value: String): Boolean {
+    /** Relative paths, the loader's `/themes_custom/` folder path and `file:` paths it writes for picked images; HTTPS when [remote]. */
+    private fun localUrls(value: String, remote: Boolean = false): Boolean {
         if (!value.contains("url(", ignoreCase = true)) return true
         for (m in URL_RE.findAll(value)) {
             val u = (m.groups[1] ?: m.groups[2] ?: m.groups[3])?.value?.trim().orEmpty()
             if (u.isEmpty()) continue
             val low = u.lowercase()
-            if (low.startsWith("file:") || low.startsWith("/themes_custom/")) continue
+            if (low.startsWith("file:") || low.startsWith("/themes_custom/") || (remote && RemoteFonts.isHttps(u))) continue
             if (u.startsWith("/") || u.startsWith("\\") || SCHEME_RE.containsMatchIn(u)) return false
         }
         return true
@@ -64,6 +68,18 @@ object CommunityThemePackage {
         }
         spec.backgroundImage?.let(::File)?.takeIf { it.isFile }?.let { f ->
             imageExt(f)?.let { add("$IMAGE_NAME.$it" to f) }
+        }
+        val l = spec.layout ?: return@buildList
+        val images = listOf(
+            "hero" to l.heroImage,
+            "frame" to l.tileFrames?.firstOrNull()?.image,
+            "frame-mask" to l.tileFrames?.firstOrNull()?.mask,
+            "frame-wide" to l.tileFrameWide?.image,
+            "frame-wide-mask" to l.tileFrameWide?.mask,
+        )
+        for ((name, path) in images) {
+            val f = path?.let(::File)?.takeIf { it.isFile } ?: continue
+            imageExt(f)?.let { add("$name.$it" to f) }
         }
     }
 
@@ -94,12 +110,11 @@ object CommunityThemePackage {
         return JsonObject(m).toString()
     }
 
-    /** Writes [spec] as a native theme zip at [dest]: theme.json, theme.css and the font / background image it uses. */
+    /** Writes [spec] as a native theme zip at [dest]: theme.json, theme.css and the font and images it uses. */
     fun write(spec: ThemeSpec, name: String, author: String, version: String, description: String, dest: File) {
         val files = assets(spec)
         val byPath = HashMap<String, String>()
-        spec.fontFile?.let { p -> files.firstOrNull { it.second.path == p }?.let { byPath[p] = it.first } }
-        spec.backgroundImage?.let { p -> files.firstOrNull { it.second.path == p }?.let { byPath[p] = it.first } }
+        for ((entry, f) in files) byPath.putIfAbsent(f.path, entry)
         val css = ThemeCssWriter.write(spec) { byPath[it] }
         ZipOutputStream(dest.outputStream().buffered()).use { zip ->
             fun put(entry: String, bytes: ByteArray) {

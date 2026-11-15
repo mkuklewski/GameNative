@@ -859,6 +859,7 @@
     <string name="settings_performance_shared_shader_cache_subtitle">Del de shadere, der optages mens du spiller, med andre spillere. Slås dette fra, hentes de delte caches, der mindsker hakken, heller ikke</string>
     <string name="shader_cache_preparing">Forbereder shadere…</string>
     <string name="shader_cache_preparing_progress">Forbereder shadere %1$d%%</string>
+    <string name="fex_code_cache_building">Bygger kodecache… (%1$d/%2$d)</string>
 
     <!-- Settings: Emulation Group -->
     <string name="settings_emulation_title">Emulering</string>
@@ -866,6 +867,7 @@
     <string name="settings_accounts_signed_out">Ikke logget ind</string>
     <string name="settings_accounts_ea_title">EA-konto</string>
     <string name="settings_accounts_rockstar_title">Rockstar-konto</string>
+    <string name="settings_accounts_ubisoft_title">Ubisoft-konto</string>
     <string name="gamenative_account_title">GameNative-konto</string>
     <string name="gamenative_account_sign_in">Log ind</string>
     <string name="gamenative_account_sign_in_subtitle">Log ind for at se dit abonnement og administrere det.</string>
@@ -965,10 +967,10 @@
     <string name="support_checkout_no_browser">Der blev ikke fundet en browser til at åbne betalingssiden. Scan koden med en anden enhed i stedet.</string>
     <string name="support_checkout_failed">Betalingssiden kunne ikke åbnes. Tjek din forbindelse, og prøv igen.</string>
     <string name="support_checkout_done">Færdig</string>
-    <string name="main_thank_you_message_play">Bliv medlem i dag. Medlemmer får:\n\n• AI-hjælp til at få dine spil til at køre\n• Tidlig adgang til nye udgivelser\n• Premium-roller og eksklusive kanaler på Discord\n• …og mere\n\nFra %1$s/måned</string>
+    <string name="main_thank_you_message_play">Bliv medlem i dag. Medlemmer får:\n\n• Optimer: spil kører bedre, tilpasset din enhed og spillestil\n• AI-hjælp til at få dine spil til at køre\n• Tidlig adgang til nye builds\n• Premium-roller og eksklusive kanaler på Discord\n• …og mere\n\nFra %1$s/måned</string>
     <string name="support_plan_pro_title_priced">%1$s/måned · Pro</string>
     <string name="support_plan_basic_title_priced">%1$s/måned · Basic</string>
-    <string name="membership_plans_pitch">Medlemmer får AI-hjælp til at få spil til at køre, tidlig adgang til nye udgivelser og premium-roller på Discord.</string>
+    <string name="membership_plans_pitch">Medlemmer får Optimer, som lærer af din spillestil for at få dine spil til at køre bedre, AI-hjælp til at få dine spil til at køre og tidlig adgang til builds.</string>
     <string name="membership_plans_title">Bliv medlem</string>
     <string name="support_already_member">Allerede medlem? Log ind</string>
     <string name="support_checkout_expired">Betalingen udløb. Hvis du allerede har betalt, så log ind med den e-mail, du brugte, og din plan vises.</string>
@@ -1011,8 +1013,10 @@
     <string name="settings_emulation_default_config_dialog_title">Standard containerkonfiguration</string>
     <string name="settings_emulation_auto_apply_known_config_title">Anvend kendt konfiguration automatisk</string>
     <string name="settings_emulation_auto_apply_known_config_subtitle">Anvend automatisk anbefalede indstillinger for Steam-spil ved første start</string>
-    <string name="settings_emulation_fex_code_cache_title">FEX-kodecacher</string>
-    <string name="settings_emulation_fex_code_cache_subtitle">Del hvilken kode FEX oversatte, og hent færdige oversættelser for hurtigere start. Cacher bruger lagerplads i spillets præfiks.</string>
+    <string name="settings_emulation_fex_code_map_upload_title">Upload FEX-kodekort</string>
+    <string name="settings_emulation_fex_code_map_upload_subtitle">Sender hvilke kodeblokke i et spils programfiler der blev kørt, ingen personlige data. Normalt under 1 MB pr. spil.</string>
+    <string name="settings_emulation_fex_code_cache_use_title">Brug FEX-kodecaches (eksperimentel)</string>
+    <string name="settings_emulation_fex_code_cache_use_subtitle">Kan gøre opstart hurtigere og reducere CPU-forbruget, kan bruge et par hundrede MB pr. spil og tilføjer et ekstra trin, når spil startes</string>
     <string name="settings_emulation_box64_presets_title">Box64-forudindstillinger</string>
     <string name="settings_emulation_box64_presets_subtitle">Vis, redigér og opret Box64-forudindstillinger</string>
     <string name="settings_emulation_driver_manager_title">Driverhåndtering</string>
@@ -1058,17 +1062,15 @@
 
     <!-- Settings: Themes -->
     <string name="themes_title">Temaer</string>
-    <string name="themes_manage">Administrer temaer</string>
-    <string name="themes_settings_subtitle">Installer og kombiner Steam Deck CSS Loader-temaer. Aktiveret: %1$d</string>
     <string name="themes_tab_installed">Installeret</string>
-    <string name="themes_tab_steam_deck">Steam Deck</string>
+    <string name="themes_tab_steam_deck">SteamOS-lignende</string>
     <string name="themes_import_zip">Importer zip</string>
     <string name="themes_import_folder">Importer mappe</string>
     <string name="themes_create_starter">Opret starttema</string>
     <string name="themes_empty">Ingen temaer installeret endnu. Importer et, eller gennemse butikken.</string>
     <string name="themes_by_author">af %1$s</string>
     <string name="themes_changes">Ændrer: %1$s</string>
-    <string name="themes_field_colours">farver</string>
+    <string name="themes_field_colors">farver</string>
     <string name="themes_field_corners">hjørner</string>
     <string name="themes_field_font">skrifttype</string>
     <string name="themes_field_background">baggrund</string>
@@ -1085,6 +1087,8 @@
     <string name="themes_choose_image">Vælg billede</string>
     <string name="themes_clear_image">Ryd</string>
     <string name="themes_no_image">Intet billede</string>
+    <string name="themes_choose_font">Vælg skrifttype</string>
+    <string name="themes_no_font">Ingen skrifttype</string>
     <string name="themes_hue">Farvetone</string>
     <string name="themes_saturation">Mætning</string>
     <string name="themes_brightness">Lysstyrke</string>
@@ -1097,6 +1101,12 @@
     <string name="themes_load_more">Indlæs flere</string>
     <string name="themes_store_error">Kunne ikke indlæse temabutikken: %1$s</string>
     <string name="themes_store_empty">Ingen temaer fundet</string>
+    <string name="themes_store_compat_note">Lavet til SteamOS. GameNative tilpasser disse temaer, så kun bekræftede temaer er tjekket for at ligne deres skærmbilleder.</string>
+    <string name="themes_compat_verified">Bekræftet</string>
+    <string name="themes_compat_incompatible">Ikke kompatibel</string>
+    <string name="themes_compat_incompatible_note">Dette tema ændrer dele af SteamOS, som GameNative ikke har.</string>
+    <string name="themes_compat_unverified">Ikke bekræftet</string>
+    <string name="themes_compat_unverified_note">Kan se anderledes ud end på skærmbilledet.</string>
     <string name="themes_retry">Prøv igen</string>
     <string name="themes_custom_subtitle">Vælg dine egne farver og dit eget layout</string>
     <string name="themes_field_effects">effekter</string>
@@ -1141,7 +1151,7 @@
     <string name="themes_share_updated">Opdaterede %1$s i fællesskabslisten</string>
     <string name="themes_shared_note">Delt med fællesskabet</string>
     <string name="themes_share_blocked_title">Dette tema kan ikke deles</string>
-    <string name="themes_share_blocked_not_native">Kun temaer lavet med GameNatives egne variabler, inklusive det brugerdefinerede tema, kan deles. Steam Deck-temaer kan ikke deles.</string>
+    <string name="themes_share_blocked_not_native">Kun temaer lavet med GameNatives egne variabler, inklusive det brugerdefinerede tema, kan deles. SteamOS-lignende temaer kan ikke deles.</string>
     <string name="themes_share_blocked_empty">Dette tema ændrer ikke noget endnu. Skift nogle farver eller indstillinger først.</string>
     <string name="themes_share_blocked_too_large">Dette tema er for stort til at blive delt.</string>
     <string name="themes_sign_in_title">GameNative-konto påkrævet</string>
@@ -1298,7 +1308,7 @@
     <string name="main_recent_crash_title">Nylig crash</string>
     <string name="main_recent_crash_message">Beklager det!\nDet ville være dejligt at vide om det nylige problem, du har haft.\nDu kan se og eksportere den nyeste crash-log i appens indstillinger og vedhæfte den som et Github-problem i projektets repository.\nLink til Github-repo er også i indstillinger!</string>
     <string name="main_thank_you_title">Nyder du GameNative?</string>
-    <string name="main_thank_you_message">Bliv medlem i dag. Medlemmer får:\n\n• AI-hjælp til at få dine spil til at køre\n• Tidlig adgang til nye udgivelser\n• Premium-roller og eksklusive kanaler på Discord\n• …og mere\n\nFra $5/måned</string>
+    <string name="main_thank_you_message">Bliv medlem i dag. Medlemmer får:\n\n• Optimer: spil kører bedre, tilpasset din enhed og spillestil\n• AI-hjælp til at få dine spil til at køre\n• Tidlig adgang til nye builds\n• Premium-roller og eksklusive kanaler på Discord\n• …og mere\n\nFra $5/måned</string>
     <string name="main_join_kofi">Bliv medlem</string>
     <string name="pitch_session_title">Nyder du %1$s?</string>
     <string name="pitch_five_star_title">Godt, at %1$s kørte perfekt!</string>
@@ -1492,6 +1502,8 @@
     <string name="library_layout_capsule">Kapsel</string>
     <string name="library_layout_hero">Helt</string>
     <string name="library_layout_carousel">Karrusel</string>
+    <string name="library_layout_shelf">Hylde</string>
+    <string name="library_no_playtime">Ingen spilletid endnu</string>
     <string name="library_search_placeholder">Søg i dine spil...</string>
     <string name="library_search_description">Søg</string>
     <string name="library_search_clear">Ryd søgning</string>
@@ -1733,6 +1745,15 @@
     <string name="rockstar_preparing">Forbereder understøttelse af Rockstar-launcheren</string>
     <string name="rockstar_runtime_installing">Installerer Social Club-runtime</string>
     <string name="rockstar_installer_missing">Social Club-installationsprogrammet mangler i spilfilerne. Verificer spilfilerne i Steam, og prøv igen.</string>
+    <string name="ubisoft_preparing">Forbereder understøttelse af Ubisoft Connect</string>
+    <string name="ubisoft_runtime_installing">Henter Ubisoft Connect-filer fra Ubisoft</string>
+    <string name="ubisoft_login_required_title">Ubisoft-login påkrævet</string>
+    <string name="ubisoft_login_failed">Ubisoft-login mislykkedes: %1$s</string>
+    <string name="ubisoft_error_title">Ubisoft Connect</string>
+    <string name="ubisoft_error_session">Ubisoft accepterede ikke login. Log ud af Ubisoft i Indstillinger, og log ind igen.</string>
+    <string name="ubisoft_error_not_owned">Denne Ubisoft-konto har ikke spillet, og Steam-kopien kunne ikke føjes til den.</string>
+    <string name="ubisoft_error_activation">Ubisoft afviste at aktivere spillet.</string>
+    <string name="ubisoft_error_generic">Understøttelsen af Ubisoft Connect stoppede med fejl %1$d.</string>
     <string name="gog_login_cancel">Annuller</string>
     <string name="gog_settings_logout_title">Log ud af GOG</string>
     <string name="gog_settings_logout_subtitle">Log ud fra din GOG-konto</string>
@@ -2096,6 +2117,7 @@
     <string name="game_launch_tip_23">Tip: Hvis du har et Mali GPU, skal du bruge systemdrivere.</string>
     <string name="game_launch_tip_24">Tip: Får du en sort skærm? Prøv at bruge \"%s\"-indstillingen i menuen for at kontrollere, om dine drivere fungerer korrekt.</string>
     <string name="game_launch_tip_25">Tip: Brug Proton x86-64, hvis du ikke kan klikke med musen i spil.</string>
+    <string name="launch_skip">Spring over</string>
     <string name="launch_bionic_steam_description">Aktiverer online-spil og forbedrer kompatibilitet\nVirker ikke altid\nTag backup af dine gemte spil, før du prøver dette</string>
 
     <!-- Frontend Sync Settings -->

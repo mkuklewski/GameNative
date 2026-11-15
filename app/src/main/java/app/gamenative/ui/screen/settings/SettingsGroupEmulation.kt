@@ -22,8 +22,8 @@ import app.gamenative.ui.theme.settingsTileColors
 import app.gamenative.ui.theme.settingsTileColorsAlt
 import app.gamenative.utils.ContainerUtils
 import com.alorma.compose.settings.ui.SettingsGroup
-import com.alorma.compose.settings.ui.SettingsMenuLink
-import com.alorma.compose.settings.ui.SettingsSwitch
+import app.gamenative.ui.component.settings.SettingsMenuLink
+import app.gamenative.ui.component.settings.SettingsSwitch
 
 @Composable
 fun SettingsGroupEmulation() {
@@ -102,15 +102,29 @@ fun SettingsGroupEmulation() {
                 PrefManager.autoApplyKnownConfig = it
             },
         )
-        var fexCodeCacheEnabled by rememberSaveable { mutableStateOf(PrefManager.fexCodeCacheEnabled) }
+        var fexCodeMapUploadEnabled by rememberSaveable { mutableStateOf(PrefManager.fexCodeMapUploadEnabled) }
+        var fexCodeCacheUseEnabled by rememberSaveable { mutableStateOf(PrefManager.fexCodeCacheUseEnabled) }
         SettingsSwitch(
             colors = settingsTileColorsAlt(),
-            state = fexCodeCacheEnabled,
-            title = { Text(text = stringResource(R.string.settings_emulation_fex_code_cache_title)) },
-            subtitle = { Text(text = stringResource(R.string.settings_emulation_fex_code_cache_subtitle)) },
+            state = fexCodeMapUploadEnabled,
+            title = { Text(text = stringResource(R.string.settings_emulation_fex_code_map_upload_title)) },
+            subtitle = { Text(text = stringResource(R.string.settings_emulation_fex_code_map_upload_subtitle)) },
             onCheckedChange = {
-                fexCodeCacheEnabled = it
-                PrefManager.fexCodeCacheEnabled = it
+                fexCodeMapUploadEnabled = it
+                PrefManager.fexCodeMapUploadEnabled = it
+                // The preference writes are asynchronous; reading them back here could return the old value.
+                if (!it) fexCodeCacheUseEnabled = false
+            },
+        )
+        SettingsSwitch(
+            colors = settingsTileColorsAlt(),
+            enabled = fexCodeMapUploadEnabled,
+            state = fexCodeCacheUseEnabled,
+            title = { Text(text = stringResource(R.string.settings_emulation_fex_code_cache_use_title)) },
+            subtitle = { Text(text = stringResource(R.string.settings_emulation_fex_code_cache_use_subtitle)) },
+            onCheckedChange = {
+                PrefManager.fexCodeCacheUseEnabled = it
+                fexCodeCacheUseEnabled = it && fexCodeMapUploadEnabled
             },
         )
         SettingsMenuLink(
