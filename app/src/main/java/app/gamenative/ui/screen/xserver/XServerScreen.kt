@@ -3421,11 +3421,9 @@ fun XServerScreen(
                 PluviaApp.radialMenuCoordinator?.activeRadialMenuJson()?.let {
                     PrefManager.defaultRadialMenu = it
                 }
-                android.widget.Toast.makeText(
-                    context,
+                app.gamenative.ui.util.SnackbarManager.show(
                     context.getString(R.string.gesture_set_as_default_done),
-                    android.widget.Toast.LENGTH_SHORT,
-                ).show()
+                )
                 ui.showTouchGestureDialog = false
             },
         )
