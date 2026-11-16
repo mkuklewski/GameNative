@@ -4,6 +4,8 @@ import android.content.Context;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.StateListDrawable;
 import android.util.Log;
+import android.os.SystemClock;
+import android.view.HapticFeedbackConstants;
 import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
@@ -107,6 +109,10 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
     // Long-press detection
     private Runnable longPressRunnable;
     private boolean longPressTriggered;
+    // Hold then drag: armed once the finger has been held still for holdDragDelay
+    private boolean holdDragArmed;
+    private long touchDownTime;
+    private String activeDragAction;
     private boolean longPressActionHeld, twoFingerHoldActionHeld, threeFingerHoldActionHeld;
 
     // Double-tap detection
@@ -934,6 +940,9 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
         int y = (int) pt[1];
 
         longPressTriggered = longPressActionHeld = false;
+        holdDragArmed = false;
+        touchDownTime = SystemClock.uptimeMillis();
+        activeDragAction = null;
         doubleTapDetected = false;
         isDragging = false;
         dragButtonPressed = false;
@@ -989,8 +998,20 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
             }
         }
 
-        // Schedule long-press
-        if (gestureConfig.getLongPressEnabled()) {
+        // Hold then drag: after the hold delay, arm it with a short vibration. A move
+        // from here draws holdDragAction from the touch-down point; lifting the finger
+        // without moving gives the long press (if held long enough) or a tap.
+        if (gestureConfig.getHoldDragEnabled()) {
+            longPressRunnable = () -> {
+                holdDragArmed = true;
+                setRadialMenuGesturePoint(touchDownRawX, touchDownRawY);
+                performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                notifyHighlight(touchDownRawX, touchDownRawY);
+                notifyGesture("Hold", true);
+            };
+            postDelayed(longPressRunnable, gestureConfig.getHoldDragDelay());
+        } else if (gestureConfig.getLongPressEnabled()) {
+            // Schedule long-press
             longPressRunnable = () -> {
                 longPressTriggered = true;
                 setRadialMenuGesturePoint(touchDownRawX, touchDownRawY);
@@ -1009,6 +1030,7 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
     // ── Second+ finger down ──────────────────────────────────────────
     private void handleTsPointerDown(MotionEvent event) {
         flushPendingHoldClickRelease();
+        holdDragArmed = false;
         // Cancel any single-finger long-press.  cancelLongPressTimer only
         // clears the pending runnable; if the long-press has already fired
         // we must also release the held action before we transition into a
@@ -1106,8 +1128,11 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
         movedBeyondTapThreshold = true;
 
         // Detect drag start
-        if (!isDragging && gestureConfig.getDragEnabled()) {
-            String dragAction = gestureConfig.getDragAction();
+        if (!isDragging && (holdDragArmed || gestureConfig.getDragEnabled())) {
+            String dragAction = holdDragArmed
+                    ? gestureConfig.getHoldDragAction()
+                    : gestureConfig.getDragAction();
+            activeDragAction = dragAction;
             isDragging = true;
             dragButtonPressed = true;
             singleFingerLastRawX = event.getX(pointerIndex);
@@ -1126,13 +1151,13 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
             } else {
                 performPanAction(0f, 0f, dragAction);
             }
-            notifyGesture("Drag", true);
+            notifyGesture(holdDragArmed ? "Hold + Drag" : "Drag", true);
             // Non-click pan actions continue with real deltas on the next frame.
             return;
         }
 
         if (isDragging) {
-            String dragAction = gestureConfig.getDragAction();
+            String dragAction = activeDragAction != null ? activeDragAction : gestureConfig.getDragAction();
             if (isClickDragAction(dragAction) && !useRelativeMouseDragMovement()) {
                 moveCursorTo(x, y);
                 return;
@@ -1340,6 +1365,26 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
             finishHoldMouseButtonTouch();
             return;
         }
+
+        if (holdDragArmed && !isDragging) {
+            // Held but never moved: the long press fires now, on release, as in Windows
+            holdDragArmed = false;
+            long heldMs = SystemClock.uptimeMillis() - touchDownTime;
+            if (gestureConfig.getLongPressEnabled() && heldMs >= gestureConfig.getLongPressDelay()) {
+                float[] downPt = XForm.transformPoint(xform, touchDownRawX, touchDownRawY);
+                moveCursorTo((int) downPt[0], (int) downPt[1]);
+                setRadialMenuGesturePoint(touchDownRawX, touchDownRawY);
+                String action = gestureConfig.getLongPressAction();
+                // A click, whatever the hold behavior: the finger has already lifted
+                boolean held = injectHoldAction(action, TouchGestureConfig.MOUSE_BEHAVIOR_CLICK);
+                releaseHoldAction(held, action);
+                notifyHighlight(touchDownRawX, touchDownRawY);
+                notifyGesture("Long Press");
+                return;
+            }
+            // Not held long enough for a long press: it is a tap
+        }
+        holdDragArmed = false;
 
         if (longPressTriggered) {
             // Release the long-press action

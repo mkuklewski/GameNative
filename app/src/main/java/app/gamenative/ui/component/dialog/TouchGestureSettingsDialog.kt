@@ -190,6 +190,31 @@ fun TouchGestureSettingsDialog(
                     )
                 }
 
+                // ── Hold then drag (GameNative S23) ─────────────────────
+                GestureRow(
+                    title = stringResource(R.string.gesture_hold_drag),
+                    subtitle = panActionLabel(config.holdDragAction),
+                    enabled = config.holdDragEnabled,
+                    onEnabledChange = { config = config.copy(holdDragEnabled = it) },
+                ) {
+                    PanActionPicker(
+                        currentAction = config.holdDragAction,
+                        onActionSelected = { config = config.copy(holdDragAction = it) },
+                    )
+                    DelayTextField(
+                        label = stringResource(R.string.gesture_hold_drag_delay),
+                        value = config.holdDragDelay,
+                        valueRange = 50..2000,
+                        onValueChange = { config = config.copy(holdDragDelay = it) },
+                    )
+                    Text(
+                        text = stringResource(R.string.gesture_hold_drag_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
+
                 // ── Drag (customisable action) ──────────────────────────
                 GestureRow(
                     title = stringResource(R.string.gesture_drag),

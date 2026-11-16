@@ -64,6 +64,36 @@ class TouchGestureConfigTest {
     }
 
     @Test
+    fun `hold drag defaults off for older configs`() {
+        val config = TouchGestureConfig.fromJson("""{"tapEnabled":true}""")
+
+        assertEquals(false, config.holdDragEnabled)
+        assertEquals(TouchGestureConfig.PAN_LEFT_CLICK_DRAG, config.holdDragAction)
+        assertEquals(TouchGestureConfig.DEFAULT_DELAY_MS, config.holdDragDelay)
+    }
+
+    @Test
+    fun `hold drag round trips through json`() {
+        val expected = TouchGestureConfig(
+            holdDragEnabled = true,
+            holdDragAction = TouchGestureConfig.PAN_RIGHT_CLICK_DRAG,
+            holdDragDelay = 220,
+        )
+
+        val actual = TouchGestureConfig.fromJson(expected.toJson())
+        assertTrue(actual.holdDragEnabled)
+        assertEquals(TouchGestureConfig.PAN_RIGHT_CLICK_DRAG, actual.holdDragAction)
+        assertEquals(220, actual.holdDragDelay)
+    }
+
+    @Test
+    fun `hold drag falls back to box selection for an unknown action`() {
+        val config = TouchGestureConfig.fromJson("""{"holdDragEnabled":true,"holdDragAction":"nonsense"}""")
+
+        assertEquals(TouchGestureConfig.PAN_LEFT_CLICK_DRAG, config.holdDragAction)
+    }
+
+    @Test
     fun `action combo encodes and decodes with modifiers first`() {
         val combo = TouchGestureConfig.actionComboOf(listOf("key_1", "key_CTRL_L"))
 

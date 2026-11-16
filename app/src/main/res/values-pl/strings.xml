@@ -940,6 +940,9 @@
     <string name="gesture_set_as_default">Ustaw jako domyślne dla nowych gier</string>
     <string name="gesture_set_as_default_subtitle">Zapisuje te gesty dla tej gry, a nowe gry uruchamiają się w trybie dotykowym z tymi gestami i menu radialnym tej gry</string>
     <string name="gesture_set_as_default_done">Zapisano jako domyślne dla nowych gier</string>
+    <string name="gesture_hold_drag">Przytrzymaj, potem przeciągnij</string>
+    <string name="gesture_hold_drag_delay">Czas przytrzymania (ms)</string>
+    <string name="gesture_hold_drag_hint">Trzymaj palec w miejscu, aż telefon zawibruje, potem przeciągnij. Puszczenie bez ruchu daje długie naciśnięcie (jeśli trzymane dość długo) albo stuknięcie.</string>
 
     <!-- Shooter Mode -->
     <string name="shooter_mode_settings">Ustawienia dynamicznych joysticków</string>

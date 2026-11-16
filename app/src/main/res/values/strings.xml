@@ -1143,6 +1143,9 @@
     <string name="gesture_set_as_default">Set as Default for New Games</string>
     <string name="gesture_set_as_default_subtitle">Saves these gestures for this game and makes new games start in touchscreen mode with them and with this game\'s radial menu</string>
     <string name="gesture_set_as_default_done">Saved as default for new games</string>
+    <string name="gesture_hold_drag">Hold, Then Drag</string>
+    <string name="gesture_hold_drag_delay">Hold Time (ms)</string>
+    <string name="gesture_hold_drag_hint">Hold the finger still until the phone vibrates, then drag. Lifting it without moving gives the long press (if held long enough) or a tap.</string>
 
     <string name="external_display_input">External Display Input</string>
     <string name="external_display_input_subtitle">Choose how a connected presentation display should behave</string>

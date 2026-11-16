@@ -4610,9 +4610,18 @@ private fun setupXEnvironment(
             }
         }
 
+        val wineStartCommand =
+            getWineStartCommand(context, appId, container, bootToContainer, testGraphics, appLaunchInfo, envVars, guestProgramLauncherComponent, gameSource, offline)
+        // The ColdClient loader already hands the game ExeCommandLine from its ini, which
+        // holds the container's exec args, and it forwards its own arguments as well:
+        // appending them to the loader too made the game get every argument twice.
+        val argsInColdClientIni = wineStartCommand.contains("steamclient_loader") &&
+            !container.isUseLegacyDRM &&
+            !ContainerUtils.isAbsoluteWindowsPath(container.executablePath) &&
+            finalExecArgs == container.execArgs
         gameExecutable = "wine explorer /desktop=shell," + xServer.screenInfo + " " +
-            getWineStartCommand(context, appId, container, bootToContainer, testGraphics, appLaunchInfo, envVars, guestProgramLauncherComponent, gameSource, offline) +
-            (if (finalExecArgs.isNotEmpty()) " $finalExecArgs" else "")
+            wineStartCommand +
+            (if (finalExecArgs.isNotEmpty() && !argsInColdClientIni) " $finalExecArgs" else "")
         preInstallCommands = PreInstallSteps.getPreInstallCommands(
             container,
             appId,

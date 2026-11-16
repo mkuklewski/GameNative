@@ -78,6 +78,13 @@ data class TouchGestureConfig(
     //     treating the stylus as an absolute mouse. Hover still moves the cursor
     //     and the stylus side button still gives a right click.
     val stylusAsFinger: Boolean = false,
+
+    // 17. Hold then drag: a finger held still for holdDragDelay ms and then moved
+    //     runs holdDragAction (a box selection by default) from the touch-down
+    //     point. With it on, a long press fires when the finger lifts without moving.
+    val holdDragEnabled: Boolean = false,
+    val holdDragAction: String = PAN_LEFT_CLICK_DRAG,
+    val holdDragDelay: Int = DEFAULT_DELAY_MS,
 ) {
 
     // ── Serialisation ────────────────────────────────────────────────────
@@ -126,6 +133,9 @@ data class TouchGestureConfig(
             put(KEY_GESTURE_THRESHOLD, gestureThreshold)
             put(KEY_MOUSE_DRAG_MOVEMENT_MODE, mouseDragMovementMode)
             put(KEY_STYLUS_AS_FINGER, stylusAsFinger)
+            put(KEY_HOLD_DRAG_ENABLED, holdDragEnabled)
+            put(KEY_HOLD_DRAG_ACTION, holdDragAction)
+            put(KEY_HOLD_DRAG_DELAY, holdDragDelay)
         }.toString()
     }
 
@@ -213,6 +223,9 @@ data class TouchGestureConfig(
         private const val KEY_GESTURE_THRESHOLD = "gestureThreshold"
         private const val KEY_MOUSE_DRAG_MOVEMENT_MODE = "mouseDragMovementMode"
         private const val KEY_STYLUS_AS_FINGER = "stylusAsFinger"
+        private const val KEY_HOLD_DRAG_ENABLED = "holdDragEnabled"
+        private const val KEY_HOLD_DRAG_ACTION = "holdDragAction"
+        private const val KEY_HOLD_DRAG_DELAY = "holdDragDelay"
 
         /**
          * Compatibility-safe defaults for existing (pre-overhaul) configs.
@@ -284,6 +297,10 @@ data class TouchGestureConfig(
                         obj.optString(KEY_MOUSE_DRAG_MOVEMENT_MODE, MOUSE_DRAG_MOVEMENT_DIRECT),
                     ),
                     stylusAsFinger = obj.optBoolean(KEY_STYLUS_AS_FINGER, false),
+                    holdDragEnabled = obj.optBoolean(KEY_HOLD_DRAG_ENABLED, false),
+                    holdDragAction = obj.optString(KEY_HOLD_DRAG_ACTION, PAN_LEFT_CLICK_DRAG)
+                        .takeIf { it in PAN_ACTIONS } ?: PAN_LEFT_CLICK_DRAG,
+                    holdDragDelay = obj.optInt(KEY_HOLD_DRAG_DELAY, DEFAULT_DELAY_MS),
                 )
             } catch (_: Exception) {
                 compatibilityDefaults()
