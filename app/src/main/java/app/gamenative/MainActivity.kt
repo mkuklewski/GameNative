@@ -86,6 +86,12 @@ class MainActivity : ComponentActivity() {
         private var currentOrientationChangeValue: Int = 0
         private var availableOrientations: EnumSet<Orientation> = EnumSet.of(Orientation.UNSPECIFIED)
 
+        // S23 fork: set once the orientator has been asked for. onStop drops the sensor listener and
+        // nothing used to bring it back, so after the screen turned off or the app went to the
+        // background the game stayed stuck on one landscape side. onStart restarts it while this is
+        // set; it lives here so a recreated activity restarts it too.
+        private var orientatorWanted = false
+
         fun isHeadset(context: Context): Boolean =
             context.packageManager.hasSystemFeature("android.hardware.vr.headtracking") ||
                 Build.MANUFACTURER.equals("Oculus", true) ||
@@ -646,6 +652,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        if (orientatorWanted && orientationSensorListener == null) startOrientator()
+    }
+
     override fun onStop() {
         super.onStop()
         orientationSensorListener?.disable()
@@ -757,6 +768,9 @@ class MainActivity : ComponentActivity() {
 
     private fun startOrientator() {
         // Log.d("MainActivity$index", "Orientator starting up")
+        orientatorWanted = true
+        // Never stack listeners: the event can fire again after onStart already restarted one.
+        orientationSensorListener?.disable()
 
         // create and register the orientation listener
         orientationSensorListener = object : OrientationEventListener(this) {
