@@ -4642,6 +4642,16 @@ private fun setupXEnvironment(
         envVars.remove("DXVK_FRAME_RATE")
         envVars.remove("VKD3D_FRAME_RATE")
         if (!envVars.has("WINEESYNC")) envVars.put("WINEESYNC", "1")
+        // S23 fork: Samsung's Adreno 740 needs Turnip's UBWC flag hint, or game frames turn into tile garbage whenever
+        // an overlay (S Pen icon, system bars) makes SurfaceFlinger compose on the GPU. Upstream only writes it into
+        // containers created after it landed, and config imports overwrite it, so apply it at launch for every game.
+        // A FD_DEV_FEATURES value set in the container wins.
+        if (!envVars.has("FD_DEV_FEATURES") &&
+            Build.MANUFACTURER.equals("samsung", ignoreCase = true) &&
+            GPUInformation.isAdreno740(context)
+        ) {
+            envVars.put("FD_DEV_FEATURES", "enable_tp_ubwc_flag_hint=1")
+        }
         if (debugRun) {
             DebugRunParamsHolder.get(appId)?.let { DebugRunParams.applyToDebugEnv(envVars, appId, it) }
             PerfSampler.armCpuProfile(DebugRunParamsHolder.get(appId)?.attach?.contains(DebugRunParams.ATTACH_CPU) == true)
