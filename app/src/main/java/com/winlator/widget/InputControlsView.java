@@ -1464,6 +1464,22 @@ public class InputControlsView extends View {
         return super.onGenericMotionEvent(event);
     }
 
+    // S23 fork: this view lies on top of the touchpad and is clickable, so it swallowed every
+    // hover event and the cursor stopped following a hovering S Pen while on-screen controls were
+    // shown. Hand stylus hovers on to the touchpad, as touches already are. Only when both views
+    // share a parent: then their coordinates match (in portrait the controls sit below the game).
+    @Override
+    public boolean onHoverEvent(MotionEvent event) {
+        if (isEnabled() && !editMode && touchpadView != null && touchpadView.getParent() == getParent()) {
+            int toolType = event.getToolType(0);
+            if ((toolType == MotionEvent.TOOL_TYPE_STYLUS || toolType == MotionEvent.TOOL_TYPE_ERASER)
+                    && touchpadView.onHoverEvent(event)) {
+                return true;
+            }
+        }
+        return super.onHoverEvent(event);
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         // Drawing-only profile previews have no touchpad or X server. Disabled views
