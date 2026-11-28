@@ -301,6 +301,13 @@ object PrefManager {
             setPref(GAMESCOPE_OUTPUT_RESOLUTION, value)
         }
 
+    private val GAMESCOPE_GUEST_GL = stringPreferencesKey("gamescopeGuestGl")
+    var gamescopeGuestGl: String
+        get() = getPref(GAMESCOPE_GUEST_GL, GamescopeSettings.GUEST_GL_DEFAULT)
+        set(value) {
+            setPref(GAMESCOPE_GUEST_GL, value)
+        }
+
     private val DISPLAY_RENDERER_MODE = stringPreferencesKey("display_renderer_mode")
     var displayRendererMode: String
         get() {
@@ -429,6 +436,13 @@ object PrefManager {
         get() = getPref(PULSEAUDIO_LOW_LATENCY, false)
         set(value) {
             setPref(PULSEAUDIO_LOW_LATENCY, value)
+        }
+
+    private val UBISOFT_CLOUD_SAVE_UPLOADS = booleanPreferencesKey("ubisoft_cloud_save_uploads")
+    var ubisoftCloudSaveUploads: Boolean
+        get() = getPref(UBISOFT_CLOUD_SAVE_UPLOADS, false)
+        set(value) {
+            setPref(UBISOFT_CLOUD_SAVE_UPLOADS, value)
         }
 
     private val MIC_ENABLED = booleanPreferencesKey("mic_enabled")
@@ -647,6 +661,7 @@ object PrefManager {
         set(value) {
             setPref(SHOW_CONTROLLER_DEBUG_MENU, value)
         }
+
     private val LAUNCH_BIONIC_STEAM = booleanPreferencesKey("launch_bionic_steam")
     var launchBionicSteam: Boolean
         get() = getPref(LAUNCH_BIONIC_STEAM, false)
@@ -1467,6 +1482,13 @@ object PrefManager {
             setPref(SHOW_AMAZON_IN_LIBRARY, value)
         }
 
+    private fun showStoreInLibraryKey(source: GameSource) = booleanPreferencesKey("show_${source.name.lowercase()}_in_library")
+
+    /** Whether the All tab lists games of [source], a store served through the shared store adapter. */
+    fun showStoreInLibrary(source: GameSource): Boolean = getPref(showStoreInLibraryKey(source), true)
+
+    fun setShowStoreInLibrary(source: GameSource, value: Boolean) = setPref(showStoreInLibraryKey(source), value)
+
     // Game counts for skeleton loaders
     private val CUSTOM_GAMES_COUNT = intPreferencesKey("custom_games_count")
     var customGamesCount: Int
@@ -1768,7 +1790,10 @@ object PrefManager {
         GameSource.GOG -> frontendSyncDirGog
         GameSource.AMAZON -> frontendSyncDirAmazon
         GameSource.CUSTOM_GAME -> frontendSyncDirCustom
+        else -> getPref(storeFrontendSyncKey(source), "")
     }
+
+    private fun storeFrontendSyncKey(source: GameSource) = stringPreferencesKey("frontend_sync_dir_${source.name.lowercase()}")
 
     /** Persists [path] as the export directory for [source]. Pass an empty string to clear. */
     fun setFrontendSyncDir(source: GameSource, path: String) {
@@ -1778,6 +1803,7 @@ object PrefManager {
             GameSource.GOG -> frontendSyncDirGog = path
             GameSource.AMAZON -> frontendSyncDirAmazon = path
             GameSource.CUSTOM_GAME -> frontendSyncDirCustom = path
+            else -> setPref(storeFrontendSyncKey(source), path)
         }
     }
 
@@ -1817,6 +1843,12 @@ object PrefManager {
     var steamControllerEnabled: Boolean
         get() = getPref(STEAM_CONTROLLER_ENABLED, false)
         set(value) = setPref(STEAM_CONTROLLER_ENABLED, value)
+
+    // Detailed per-step reporting on the boot splash; off means the plain indeterminate bar
+    private val VERBOSE_BOOT_PROGRESS = booleanPreferencesKey("verbose_boot_progress")
+    var verboseBootProgress: Boolean
+        get() = getPref(VERBOSE_BOOT_PROGRESS, false)
+        set(value) = setPref(VERBOSE_BOOT_PROGRESS, value)
 
     private val FAVORITE_APP_IDS = stringPreferencesKey("favorite_app_ids")
     var favoriteAppIds: Set<String>
@@ -1881,6 +1913,13 @@ object PrefManager {
             }
         }
     }
+
+    // Effekseer WASM stub for the chromium-109 audio CHECK crash. "auto" = stub below
+    // EffekseerWasmGate.AFFECTED_BELOW_MAJOR, "on" = always (no particle effects), "off" = never.
+    private val HTML5_EFFEKSEER_WASM_STUB_MODE = stringPreferencesKey("html5_effekseer_wasm_stub_mode")
+    var html5EffekseerWasmStubMode: String
+        get() = getPref(HTML5_EFFEKSEER_WASM_STUB_MODE, "auto")
+        set(value) = setPref(HTML5_EFFEKSEER_WASM_STUB_MODE, value)
 
     // Add new setting for Wine debug logging
     private val ENABLE_WINE_DEBUG = booleanPreferencesKey("enable_wine_debug")
@@ -1999,6 +2038,13 @@ object PrefManager {
             setPref(FEX_CODE_MAP_UPLOAD_ENABLED, value)
             if (!value) setPref(FEX_CODE_CACHE_USE_ENABLED, false)
         }
+
+    // Set once the code map server has answered an upload with its indirect branch count: from then on FEX
+    // records indirect branch targets (FexCodeMaps). A server that predates them refuses such maps.
+    private val FEX_CODE_MAP_INDIRECT_ACCEPTED = booleanPreferencesKey("fex_code_map_indirect_accepted")
+    var fexCodeMapIndirectAccepted: Boolean
+        get() = getPref(FEX_CODE_MAP_INDIRECT_ACCEPTED, false)
+        set(value) { setPref(FEX_CODE_MAP_INDIRECT_ACCEPTED, value) }
 
     // FEX code caches: compile the recorded maps into caches on the device and load them (FexCodeCaches).
     // Needs the maps, so it is off whenever the upload is.

@@ -9,6 +9,8 @@ import org.json.JSONObject
  * @BRIDGE@ (the name of the object exposed with addJavascriptInterface).
  */
 object RockstarSignInShim {
+    /** The name the sign-in window exposes its bridge object under. */
+    const val BRIDGE = "GNBridge"
 
     fun fingerprint(deviceName: String = "GAMENATIVE"): JSONObject = JSONObject()
         .put("device_name", deviceName)
@@ -28,7 +30,8 @@ object RockstarSignInShim {
         template.replace("@FP@", fingerprintJson).replace("@TITLE@", titleName).replace("@BRIDGE@", bridge)
 
     private fun template(filesDir: File): String {
-        val file = File(RockstarHelperArchive.directory(filesDir), RockstarHelperArchive.SIGNIN_SHIM)
+        val dir = checkNotNull(RockstarHelperArchive.installedDirectory(filesDir)) { "Rockstar helper archive is not installed" }
+        val file = File(dir, RockstarHelperArchive.SIGNIN_SHIM)
         check(file.isFile) { "Rockstar helper archive is not installed" }
         return file.readText()
     }

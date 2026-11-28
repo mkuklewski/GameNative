@@ -44,6 +44,15 @@ android {
     // https://developer.android.com/ndk/downloads
     ndkVersion = "27.3.13750724"
 
+    // build libsnappyjava.so from source: the maven jar's prebuilt is 4 KB-aligned, 64-bit libs need 16 KB.
+    // System.loadLibrary finds it because PluviaApp sets org.xerial.snappy.use.systemlib=true on device.
+    externalNativeBuild {
+        cmake {
+            path = file("../snappy-java/upstream/android/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
     signingConfigs {
         create("pluvia") {
             if (keystoreProperties != null) {
@@ -74,9 +83,9 @@ android {
         // (1.4.0-s23.1, 1.4.0-s23.2, ...). versionCode stays upstream's because the
         // GameNative servers receive it (best-config, update check); Android still
         // installs a build with an equal versionCode as an in-place update.
-        val upstreamVersionName = "1.4.0"
-        val s23Patch = 7
-        versionCode = 27
+        val upstreamVersionName = "1.4.1"
+        val s23Patch = 8
+        versionCode = 28
         versionName = "$upstreamVersionName-s23.$s23Patch"
 
         buildConfigField("boolean", "GOLD", "false")
@@ -473,6 +482,14 @@ dependencies {
     implementation(libs.xz)
     implementation(libs.jzlib)
 
+    // leveldb for html5 save sync. pure-java iq80 over leveldbjni (no arm64 natives) because we need a
+    // custom Java comparator (idb_cmp1). VENDORED fork, see iq80-leveldb/NOTICE.md.
+    implementation(project(":iq80-leveldb"))
+    implementation(project(":snappy-java"))
+    // host-test only: desktop natives stripped from the shipped :snappy-java artifact. Robolectric needs
+    // them because PluviaApp skips use.systemlib off-device.
+    testImplementation(project(path = ":snappy-java", configuration = "desktopNatives"))
+
     // Jetpack Compose
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.bundles.compose)
@@ -486,6 +503,8 @@ dependencies {
     // Support
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.webkit)
+    implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.apng)
     implementation(libs.brotli.dec)
     implementation(libs.datastore.preferences)
@@ -526,6 +545,7 @@ dependencies {
     testImplementation(libs.zstd.jni)
     testImplementation(libs.orgJson)
     testImplementation(libs.mockwebserver)
+    testImplementation(libs.rhino) // JVM JS engine -- executes pure shims (path.js, require-dispatcher.js) in tests
 
     // Add PostHog Android SDK dependency
     implementation("com.posthog:posthog-android:3.8.0")

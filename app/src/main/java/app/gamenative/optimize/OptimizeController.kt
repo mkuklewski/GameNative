@@ -11,6 +11,7 @@ import app.gamenative.PrefManager
 import app.gamenative.R
 import app.gamenative.billing.Membership
 import app.gamenative.data.GameSource
+import app.gamenative.powercontrol.PowerManager
 import app.gamenative.powercontrol.metrics.CpuClusterLayout
 import app.gamenative.powercontrol.metrics.SessionPerfSampler
 import app.gamenative.service.SteamService
@@ -230,10 +231,11 @@ object OptimizeController {
     }
 
     /** Fallback baseline when the ladder holds none: the newest run long enough to judge against; short runs are skipped. */
-    fun baselineRun(container: Container): Metrics? {
-        val files = File(container.rootDir, ".gamenative/runs").listFiles { f -> f.name.endsWith(".json") } ?: return null
-        val runs = files.sortedByDescending { it.name }.asSequence().mapNotNull { runCatching { JSONObject(it.readText()) }.getOrNull() }
-        return OptimizeJudge.baselineOf(runs)
+    fun baselineRun(container: Container): Metrics? = OptimizeJudge.baselineOf(runsNewestFirst(container))
+
+    private fun runsNewestFirst(container: Container): Sequence<JSONObject> {
+        val files = File(container.rootDir, ".gamenative/runs").listFiles { f -> f.name.endsWith(".json") } ?: return emptySequence()
+        return files.sortedByDescending { it.name }.asSequence().mapNotNull { runCatching { JSONObject(it.readText()) }.getOrNull() }
     }
 
     private fun storeName(appId: String): String = when (ContainerUtils.extractGameSourceFromContainerId(appId)) {
@@ -242,6 +244,7 @@ object OptimizeController {
         GameSource.EPIC -> "epic"
         GameSource.AMAZON -> "amazon"
         GameSource.CUSTOM_GAME -> "custom"
+        else -> ContainerUtils.extractGameSourceFromContainerId(appId).name.lowercase()
     }
 
     private fun gameId(appId: String): String =
@@ -274,7 +277,11 @@ object OptimizeController {
         if (install == null) return null
         engineHints[install.absolutePath]?.let { return it }
         val engine = runCatching { EngineHint.detect(install) }.getOrNull()
-        val meta = if (engine == EngineHint.UNITY) runCatching { EngineHint.unityMeta(install) }.getOrNull() else null
+        val meta = when (engine) {
+            EngineHint.UNITY -> runCatching { EngineHint.unityMeta(install) }.getOrNull()
+            EngineHint.UNREAL -> runCatching { EngineHint.unrealProject(install) }.getOrNull()?.let { EngineHint.Meta(null, null, it) }
+            else -> null
+        }
         return Hint(engine, meta).also { engineHints[install.absolutePath] = it }
     }
 
@@ -363,6 +370,11 @@ object OptimizeController {
             put(
                 "game",
                 gameJson(appId).apply {
+                    runCatching {
+                        OptimizeIdentity.putStoreIds(
+                            this, ContainerUtils.extractGameSourceFromContainerId(appId), ContainerUtils.extractGameIdFromContainerId(appId),
+                        )
+                    }
                     put("build", gameBuild(appId, install) ?: JSONObject.NULL)
                     put("exe", container.executablePath.orEmpty())
                     put("anticheat", JSONArray(OptimizeFiles.anticheat(container).orEmpty()))
@@ -373,6 +385,7 @@ object OptimizeController {
                             JSONObject().apply {
                                 meta.company?.let { put("company", it) }
                                 meta.product?.let { put("product", it) }
+                                meta.project?.let { put("project", it) }
                             },
                         )
                     }
@@ -397,6 +410,7 @@ object OptimizeController {
                             JSONArray().apply { layout.forEach { put(JSONObject().put("cores", JSONArray(it.cores)).put("kind", it.kind)) } },
                         )
                     }
+                    runCatching { PowerManager.powerControlCapability(container.rootDir) }.getOrNull()?.let { put("power_control", it) }
                 },
             )
             put("profile", profile.wireId)
@@ -430,6 +444,8 @@ object OptimizeController {
                         },
                     )
                     put("tried", JSONArray().apply { ladder.tried.forEach { put(it.toJson()) } })
+                    val skipped = OptimizeCards.requestSkipped(state, ladder, System.currentTimeMillis())
+                    if (skipped.isNotEmpty()) put("skipped", JSONArray().apply { skipped.forEach { put(it.toJson()) } })
                     if (state.capPreferred) put("prefer", OptimizeLocalState.PREFER_CAP)
                 },
             )
@@ -465,6 +481,7 @@ object OptimizeController {
         crash: Metrics? = null,
         appliedOps: Int? = null,
         skippedOps: Int? = null,
+        missingFiles: Int? = null,
         judgeReason: String? = null,
         excludedWindows: List<Int> = emptyList(),
         gpuWorkScaling: Double? = null,
@@ -492,6 +509,7 @@ object OptimizeController {
                 put("levers_failed", JSONArray(leversFailed))
                 appliedOps?.let { put("applied_ops", it) }
                 skippedOps?.let { put("skipped_ops", it) }
+                missingFiles?.takeIf { it > 0 }?.let { put("missing_files", it) }
             },
         )
         put(
@@ -678,7 +696,18 @@ object OptimizeController {
                     state = state.copy(card = OptimizeCard(OptimizeCard.NO_RULE, now, gameName(appId), profile))
                 }
             }
+            // An after-card still waiting takes its choices from this answer: the end card when the server is done,
+            // no keep-going choice when it has nothing next. A card already on screen is updated in place.
+            val waiting = state.card?.takeIf { it.profile == profile }
+            val updated = waiting?.let { OptimizeCards.afterNextAnswer(it, response.status) }
+            if (waiting != null && updated != null) {
+                state = state.copy(card = updated)
+                Timber.tag(TAG).i("Optimize: ${waiting.kind} card now ${updated.kind}${if (updated.nothingNext) " with nothing next" else ""} (${response.status}, $source)")
+            }
             store.write(state)
+            if (waiting != null && updated != null) {
+                cardRequest.value?.takeIf { it.appId == appId && it.card == waiting }?.let { cardRequest.value = it.copy(card = updated) }
+            }
         }
     }
 
@@ -857,7 +886,8 @@ object OptimizeController {
 
                     /**
                      * Takes one answer; true when its rung changed nothing and the next one may be asked for. [capAsked]: the
-                     * request said ladder.prefer "cap". A cap the user did not ask for ends the ladder; the cap stays a question.
+                     * request said ladder.prefer "cap". A cap the user did not ask for stays a question; once declined it is
+                     * listed as skipped and the next one may be asked for.
                      */
                     suspend fun take(result: NextRungResult?, fromPrefetch: PrefetchedRung?, capAsked: Boolean): Boolean {
                         when (result) {
@@ -896,11 +926,23 @@ object OptimizeController {
                                         val card = OptimizeCard(
                                             OptimizeCard.CAP, at, gameName(appId), profile, cls = baseline?.cls, metrics = baseline, capFps = capFps,
                                         )
-                                        state = state.copy(card = card)
+                                        state = state.copy(
+                                            card = card,
+                                            capQuestionRung = SkippedRung(unaskedCap.rungId, unaskedCap.version, OptimizeJudge.REASON_DECLINED),
+                                        )
                                         cardEvent(appId, OptimizeEvents.CAP_ASKED, state, card)
                                     }
+                                    unaskedCap != null && capChoice == OptimizeCards.UnaskedCap.SKIP -> {
+                                        // A no to the cap is not the end of the ladder: the server is asked for the step after it.
+                                        Timber.tag(TAG).i("Optimize: the cap ${unaskedCap.rungId} was not wanted; asking for the step after it")
+                                        ladder = ladder.copy(lastStatus = response.status)
+                                        state = state.copy(
+                                            capQuestionRung = SkippedRung(unaskedCap.rungId, unaskedCap.version, OptimizeJudge.REASON_DECLINED),
+                                        )
+                                        return true
+                                    }
                                     response.hasNothing || response.status == NextRungResponse.STATUS_EXHAUSTED || capChoice == OptimizeCards.UnaskedCap.END -> {
-                                        if (unaskedCap != null) Timber.tag(TAG).i("Optimize: only the cap ${unaskedCap.rungId} is left and was not wanted; the ladder ends here")
+                                        if (unaskedCap != null) Timber.tag(TAG).i("Optimize: the cap ${unaskedCap.rungId} is offered and the game is set to never; the ladder ends here")
                                         val endKind = if (response.hasNothing) OptimizeCard.NO_RULE else OptimizeCards.endCard(ladder)
                                         if (endKind == OptimizeCard.EXHAUSTED) {
                                             ladder = ladder.copy(state = LadderState.EXHAUSTED, lastStatus = NextRungResponse.STATUS_EXHAUSTED)
@@ -931,10 +973,17 @@ object OptimizeController {
                                     }
                                     else -> {
                                         ladder = ladder.copy(lastStatus = response.status)
-                                        val offered = response.rung?.takeIf { it.rungId !in ladder.bad }
+                                        val offered = response.rung
                                         val rung = offered?.takeUnless { ladder.repeats(it) }
                                         if (offered != null && rung == null) {
                                             Timber.tag(TAG).i("Optimize: skipping ${offered.rungId} v${offered.version}: ${ladder.repeatReason(offered)}")
+                                            if (ladder.skipped.none { it.rungId == offered.rungId && it.version == offered.version }) {
+                                                ladder = ladder.copy(
+                                                    skipped = (ladder.skipped + SkippedRung(offered.rungId, offered.version, OptimizeJudge.REASON_REPEAT))
+                                                        .takeLast(OptimizeLocalState.MAX_TRIED),
+                                                )
+                                            }
+                                            return true
                                         }
                                         if (rung != null) {
                                             val outcome = OptimizeApplier.apply(
@@ -957,15 +1006,20 @@ object OptimizeController {
                                                     Timber.tag(TAG).i("applied ${rung.rungId} v${rung.version} order ${rung.order} ($types$skipped)")
                                                 }
                                                 is ApplyOutcome.NoOp -> {
-                                                    ladder = ladder.triedWith(rung.rungId, rung.version, OptimizeJudge.NO_OP)
+                                                    // None of its settings files there: nothing to write for the game's settings, which the
+                                                    // server reads from the tried list; otherwise every key was at or below its step.
+                                                    val tried = if (OptimizeLadders.allFilesMissing(rung, outcome.missingFiles)) OptimizeJudge.FILE_MISSING else OptimizeJudge.NO_OP
+                                                    ladder = ladder.triedWith(rung.rungId, rung.version, tried)
                                                     state = state.queued(
                                                         outcomeBody(
                                                             appId, profile, rung.rungId, rung.version, baseline, null, OptimizeJudge.NO_OP,
                                                             0, emptyList(), appliedOps = 0, skippedOps = outcome.skippedOps,
+                                                            missingFiles = outcome.missingFiles,
                                                         ),
                                                     )
                                                     Timber.tag(TAG).i(
-                                                        "Optimize: ${rung.rungId} changed nothing (all ${outcome.skippedOps} ops at or below target or not in the file), asking for the next step",
+                                                        "Optimize: ${rung.rungId} changed nothing (${outcome.skippedOps} ops at or below target or not in the file, " +
+                                                            "${outcome.missingFiles} files not found), asking for the next step",
                                                     )
                                                     return true
                                                 }
@@ -1064,7 +1118,7 @@ object OptimizeController {
     /**
      * A pending step whose trial session started ([PendingRung.trialStartedAt]) but was never judged: its run record
      * is judged for a crash if it was written; with none, a hard death of the app since the session started, or a
-     * second unjudged launch, counts as a crash. A crash is finished like one judged at exit (reported, marked bad,
+     * second unjudged launch, counts as a crash. A crash is finished like one judged at exit (reported,
      * a worse card) and flagged to come off.
      */
     private fun judgeLostSession(
@@ -1268,10 +1322,12 @@ object OptimizeController {
                     val block = OptimizeCards.firstCardBlock(state, after, now, rulesVersion, cap)
                     cardField = OptimizeCards.cardField(block == null, block)
                     // An unsure or unlisted verdict on a real session still asks the server once per rules build;
-                    // its own verdict may leave the card. The user's holds and short sessions never ask.
+                    // its own verdict may leave the card, and a throttled one asks at every exit, even when it ran fine.
+                    // The user's holds and short sessions never ask.
                     val hold = OptimizeCards.userHold(state, after, now, rulesVersion)
+                    val throttled = OptimizeServer.throttledSession(after)
                     val asks = block == null ||
-                        (context != null && OptimizeServer.asksAtExit(block, after.gameplaySec, hold, state.exitAskedRulesVersion, rulesVersion))
+                        (context != null && OptimizeServer.asksAtExit(block, after.gameplaySec, hold, state.exitAskedRulesVersion, rulesVersion, throttled))
                     if (asks && block != null) {
                         state = state.copy(exitAskedRulesVersion = rulesVersion ?: OptimizeServer.UNKNOWN_RULES)
                         store.write(state)
@@ -1309,9 +1365,29 @@ object OptimizeController {
                     if (pending != null && pending.revert == null && sessionRung == pending.rung.rungId) {
                         // A cap step is judged against the user's own limiter, so its own cap never reads as menu windows.
                         val fpsTarget = OptimizeTarget.fpsTarget(refresh, if (pending.rung.isFpsCap) userCap else cap)
-                        state = when (val decision = OptimizeJudge.judge(after, pending.baseline, pending.rung.isFpsCap, pending.shortSessions, fpsTarget)) {
+                        val decision = OptimizeJudge.judge(
+                            after, pending.baseline, pending.rung.isFpsCap, pending.shortSessions, fpsTarget,
+                            noWindowStarts = pending.noWindowStarts,
+                            windowWithoutStep = OptimizeJudge.windowWithoutStep(runsNewestFirst(container)) ?: pending.baseline?.windowSeen,
+                        )
+                        state = when (decision) {
+                            OptimizeJudge.Decision.TooShort -> {
+                                // No result: the step stays on trial, nothing is reported, and the card says how long to play.
+                                Timber.tag(TAG).i("Optimize: ${after.gameplaySec} s of gameplay is too short to judge ${pending.rung.rungId}; it stays on trial")
+                                state.withLadder(profile, ladder.copy(pending = pending))
+                                    .copy(card = OptimizeCard(OptimizeCard.SHORT, now, gameName(appId), profile, rungId = pending.rung.rungId, metrics = after))
+                            }
+                            is OptimizeJudge.Decision.NoWindow -> {
+                                Timber.tag(TAG).i("Optimize: the game never showed its window with ${pending.rung.rungId} on trial (${decision.starts} in a row); no result yet")
+                                state.withLadder(profile, ladder.copy(pending = pending.copy(noWindowStarts = decision.starts))).queued(
+                                    outcomeBody(
+                                        appId, profile, pending.rung.rungId, pending.rung.version, pending.baseline, after, OptimizeJudge.NOT_COMPARABLE,
+                                        pending.levers.size, emptyList(), judgeReason = OptimizeJudge.REASON_NO_WINDOW,
+                                    ),
+                                )
+                            }
                             is OptimizeJudge.Decision.Short ->
-                                state.withLadder(profile, ladder.copy(pending = pending.copy(shortSessions = decision.shortSessions)))
+                                state.withLadder(profile, ladder.copy(pending = pending.copy(shortSessions = decision.shortSessions, noWindowStarts = 0)))
                             is OptimizeJudge.Decision.Crash -> {
                                 if (OptimizeJudge.frozen(after)) {
                                     Timber.tag(TAG).w("Optimize: the game froze on ${pending.rung.rungId} (${after.framesStoppedSec} s without a frame); treating it as a crash")
@@ -1785,7 +1861,10 @@ object OptimizeController {
     suspend fun continueLadder(context: Context, appId: String): ChangeResult =
         change(context, appId, touchesFiles = false, what = "continuing") { _, _, state -> OptimizeLadders.resumed(state) to true }
 
-    /** Takes off the step a helped card was about; the ladder keeps trying, so the next launch asks again. */
+    /**
+     * Takes off the step a helped card was about, or the step still on trial a too-short card was about; the ladder
+     * keeps trying, so the next launch asks again.
+     */
     private suspend fun undoStep(
         context: Context,
         appId: String,
@@ -1796,6 +1875,14 @@ object OptimizeController {
     ): Pair<OptimizeLocalState, Boolean> {
         val profile = state.activeProfile ?: return (state to true)
         val ladder = state.ladder(profile)
+        val pending = ladder.pending
+        val undone = OptimizeLadders.undoneOnTrial(ladder, rungId)
+        if (pending != null && undone != null) {
+            if (!OptimizeReverter.revertLevers(context, container, pending.levers)) return state to false
+            store.dropRungDir(profile, pending.rung.rungId)
+            val report = undoReport(appId, profile, pending.rung.rungId, pending.rung.version, pending.baseline, pending.levers.size)
+            return state.queued(report).withLadder(profile, undone) to true
+        }
         val kept = ladder.kept.lastOrNull { it.rungId == rungId } ?: return (state to true)
         if (kept.applied && !OptimizeReverter.revertLevers(context, container, kept.levers)) return state to false
         store.dropRungDir(profile, kept.rungId)
@@ -1849,6 +1936,8 @@ object OptimizeController {
             when {
                 card.kind == OptimizeCard.CAP && action == OptimizeCards.ACTION_CAP -> holdCap(context, appId, container, store, state, card)
                 card.kind == OptimizeCard.CAP -> OptimizeCards.capDeclined(state, now) to true
+                // A too-short card only tells the player something; closing it changes nothing, and Undo takes the step off.
+                card.kind == OptimizeCard.SHORT && action != OptimizeCards.ACTION_UNDO -> current.copy(card = null) to true
                 else -> null
             }?.let { return@change it }
             when (action) {

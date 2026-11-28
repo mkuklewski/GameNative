@@ -89,6 +89,7 @@ class PluviaApp : SplitCompatApplication() {
         }
 
         NetworkMonitor.init(this)
+        app.gamenative.service.store.StoreGames.attach(this)
 
         // Init our custom crash handler.
         CrashHandler.initialize(this)
@@ -278,6 +279,9 @@ class PluviaApp : SplitCompatApplication() {
         var achievementWatcher: app.gamenative.service.AchievementWatcher? = null
         var steamHostAchievementPoller: app.gamenative.service.SteamHostAchievementPoller? = null
 
+        // html5 counterpart of xEnvironment. owned by WebViewScreen (set on attach, cleared on dispose).
+        var activeWebView: android.webkit.WebView? = null
+
         var isOverlayPaused by mutableStateOf(false)
         @Volatile
         var isActivityInForeground: Boolean = true
@@ -328,6 +332,9 @@ class PluviaApp : SplitCompatApplication() {
             radialMenuCoordinator = null
             achievementWatcher = null
             steamHostAchievementPoller = null
+            // MainActivity's stale-keepAlive guard needs BOTH xEnvironment and activeWebView null;
+            // leaving this set wedges keepAlive on the next same-process launch.
+            activeWebView = null
             ActiveGameRegistry.clear()
             SteamService.clearSuspendedGameState()
             SteamService.keepAlive = false

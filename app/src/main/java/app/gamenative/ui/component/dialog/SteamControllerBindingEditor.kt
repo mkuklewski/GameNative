@@ -65,6 +65,7 @@ import app.gamenative.steamcontroller.ScEditableProfile
 import app.gamenative.steamcontroller.ScEditableSet
 import app.gamenative.steamcontroller.ScProfile
 import app.gamenative.steamcontroller.ScSource
+import app.gamenative.ui.component.RingTextButton
 import app.gamenative.ui.component.ThemedSlider
 import app.gamenative.ui.theme.PluviaTheme
 import app.gamenative.ui.theme.ThemedAlertDialog
@@ -380,14 +381,16 @@ fun SteamControllerBindingEditorDialog(containerId: String, onDismiss: () -> Uni
         )
     }
     if (showHelp) {
+        val helpScroll = rememberScrollState()
         ThemedAlertDialog(
             onDismissRequest = { showHelp = false },
+            modifier = Modifier.dialogScrollKeys(helpScroll),
             containerColor = PluviaTheme.menuColor(MaterialTheme.colorScheme.surface),
             tonalElevation = 0.dp,
             shape = MaterialTheme.shapes.large,
             title = { Text("Steam Controller bindings — help") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(modifier = Modifier.verticalScroll(helpScroll), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     // Navigation controls are rendered from the fixed [ScMenuNav] table using the app's own Xbox
                     // glyphs, so they always match what the buttons actually do (and look like the rest of the app).
                     Text("Navigating this menu", style = MaterialTheme.typography.labelLarge)
@@ -403,7 +406,7 @@ fun SteamControllerBindingEditorDialog(containerId: String, onDismiss: () -> Uni
                     )
                 }
             },
-            confirmButton = { TextButton(onClick = { showHelp = false }) { Text("Close") } },
+            confirmButton = { RingTextButton(onClick = { showHelp = false }) { Text("Close") } },
             titleContentColor = PluviaTheme.dialogTitleColor,
             textContentColor = PluviaTheme.dialogTextColor,
         )

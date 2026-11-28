@@ -31,7 +31,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -62,6 +61,8 @@ import app.gamenative.PrefManager
 import app.gamenative.R
 import app.gamenative.billing.Membership
 import app.gamenative.billing.PlayBilling
+import app.gamenative.optimize.OptimizeStatus
+import app.gamenative.ui.component.requestFocusAfterLayout
 import app.gamenative.ui.theme.ThemedDialogSurface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -84,19 +85,6 @@ private const val PHASE_LOADING = "loading"
 private const val PHASE_CHECKOUT = "checkout"
 private const val PHASE_SUBSCRIBED = "subscribed"
 private const val PHASE_FAILED = "failed"
-
-internal fun FocusRequester.requestFocusSafely(): Boolean =
-    try {
-        requestFocus()
-    } catch (_: IllegalStateException) {
-        false
-    }
-
-internal suspend fun FocusRequester.requestFocusAfterLayout() {
-    if (requestFocusSafely()) return
-    withFrameNanos { }
-    requestFocusSafely()
-}
 
 private fun hasPaidTier(tier: String?): Boolean = Membership.isPaidTier(tier)
 
@@ -431,6 +419,19 @@ private fun CheckoutQr(url: String, size: Dp) {
     }
 }
 
+/** What Basic includes: the Optimize allowance, then the custom fixes. */
+@Composable
+internal fun basicPlanBody(): String {
+    val games = OptimizeStatus.upsellMonthlyGames(null)
+    return pluralStringResource(R.plurals.membership_plan_basic_optimize, games, games) + " " +
+        stringResource(R.string.debug_paywall_tier5_body)
+}
+
+/** What Pro includes: the Optimize allowance, then the custom fixes. */
+@Composable
+internal fun proPlanBody(): String =
+    stringResource(R.string.membership_plan_pro_optimize) + " " + stringResource(R.string.debug_paywall_tier10_body)
+
 internal fun upgradeOffered(reason: String?): Boolean = !SupportApi.isFairUse(reason)
 
 @Composable
@@ -555,24 +556,23 @@ private fun UpgradeBody(
                         CircularProgressIndicator(modifier = Modifier.size(32.dp), color = PluviaTheme.progressColor)
                     }
                 } else {
-                    if (showBasic) {
-                        PremiumDialogButton(
-                            text = basicPrice?.let { stringResource(R.string.support_plan_basic_title_priced, it) }
-                                ?: stringResource(R.string.support_plan_basic_title),
-                            subtitle = stringResource(R.string.debug_paywall_tier5_body),
-                            primary = false,
-                            onClick = { onChoose("basic") },
-                            modifier = Modifier.focusRequester(firstFocus),
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
                     PremiumDialogButton(
                         text = proPrice?.let { stringResource(R.string.support_plan_pro_title_priced, it) }
                             ?: stringResource(R.string.debug_paywall_tier10_title),
-                        subtitle = stringResource(R.string.debug_paywall_tier10_body),
+                        subtitle = proPlanBody(),
                         onClick = { onChoose("pro") },
-                        modifier = if (showBasic) Modifier else Modifier.focusRequester(firstFocus),
+                        modifier = Modifier.focusRequester(firstFocus),
                     )
+                    if (showBasic) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        PremiumDialogButton(
+                            text = basicPrice?.let { stringResource(R.string.support_plan_basic_title_priced, it) }
+                                ?: stringResource(R.string.support_plan_basic_title),
+                            subtitle = basicPlanBody(),
+                            primary = false,
+                            onClick = { onChoose("basic") },
+                        )
+                    }
                     Text(
                         text = stringResource(R.string.debug_paywall_cancel_anytime) + " " +
                             stringResource(R.string.debug_paywall_costs_note),

@@ -1,5 +1,6 @@
 package app.gamenative.ui.screen.downloads
 
+import app.gamenative.service.store.StoreAdapters
 import android.content.res.Configuration
 import android.text.format.Formatter
 import androidx.activity.compose.BackHandler
@@ -83,6 +84,9 @@ import app.gamenative.R
 import app.gamenative.data.GameSource
 import app.gamenative.data.LibraryItem
 import app.gamenative.ui.component.dialog.MessageDialog
+import app.gamenative.ui.component.focusOnNavigationKey
+import app.gamenative.ui.component.focusOnOpen
+import app.gamenative.ui.component.ringSelectable
 import app.gamenative.ui.data.DownloadItemState
 import app.gamenative.ui.data.DownloadItemStatus
 import app.gamenative.ui.data.DownloadsState
@@ -130,6 +134,7 @@ fun HomeDownloadsScreen(
     val selectedSection = sections.getOrElse(selectedSectionIndex) { DownloadsSection.Downloads }
     var selectedLibraryItem by remember { mutableStateOf<LibraryItem?>(null) }
     var openGameRequestId by rememberSaveable { mutableIntStateOf(0) }
+    val sectionFocus = remember { FocusRequester() }
 
     fun fallbackLibraryItem(gameSource: GameSource, appId: String, name: String, iconUrl: String): LibraryItem {
         return LibraryItem(
@@ -193,6 +198,7 @@ fun HomeDownloadsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .focusOnNavigationKey(sectionFocus)
                 .background(PluviaTheme.screenBackground)
                 .statusBarsPadding()
                 .displayCutoutPadding(),
@@ -210,6 +216,7 @@ fun HomeDownloadsScreen(
                 DownloadsTabRow(
                     sections = sections,
                     selectedSection = selectedSection,
+                    selectedFocus = sectionFocus,
                     onSectionSelected = { selectedSectionIndex = it.ordinal },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -227,6 +234,7 @@ fun HomeDownloadsScreen(
                     DownloadsSidebar(
                         sections = sections,
                         selectedSection = selectedSection,
+                        selectedFocus = sectionFocus,
                         onSectionSelected = { selectedSectionIndex = it.ordinal },
                         modifier = Modifier
                             .width(96.dp)
@@ -280,8 +288,11 @@ fun HomeDownloadsScreen(
     MessageDialog(
         visible = confirmation != null,
         title = stringResource(R.string.cancel_download_prompt_title),
-        message = confirmation?.gameName?.let {
-            stringResource(R.string.downloads_cancel_confirm, it)
+        message = confirmation?.let {
+            stringResource(
+                if (it.keepsGame) R.string.library_cancel_download_keep_game_message else R.string.downloads_cancel_confirm,
+                it.gameName,
+            )
         },
         confirmBtnText = stringResource(R.string.yes),
         dismissBtnText = stringResource(R.string.no),
@@ -321,6 +332,7 @@ private fun DownloadsHeader(
 private fun DownloadsSidebar(
     sections: List<DownloadsSection>,
     selectedSection: DownloadsSection,
+    selectedFocus: FocusRequester,
     onSectionSelected: (DownloadsSection) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -349,6 +361,7 @@ private fun DownloadsSidebar(
                     selected = selectedSection == section,
                     onClick = { onSectionSelected(section) },
                     focusRequester = focusRequesters.getValue(section),
+                    modifier = if (selectedSection == section) Modifier.focusRequester(selectedFocus) else Modifier,
                 )
             }
 
@@ -375,6 +388,7 @@ private fun DownloadsSidebar(
 private fun DownloadsTabRow(
     sections: List<DownloadsSection>,
     selectedSection: DownloadsSection,
+    selectedFocus: FocusRequester,
     onSectionSelected: (DownloadsSection) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -392,8 +406,11 @@ private fun DownloadsTabRow(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(16.dp))
-                    .selectable(
+                    // portrait has no sidebar, so the selected tab is the default focus
+                    .then(if (isSelected) Modifier.focusOnOpen().focusRequester(selectedFocus) else Modifier)
+                    .ringSelectable(
                         selected = isSelected,
+                        shape = RoundedCornerShape(16.dp),
                         onClick = { onSectionSelected(section) },
                     ),
                 shape = RoundedCornerShape(16.dp),
@@ -1054,6 +1071,7 @@ private fun sourceLabel(gameSource: GameSource): String = when (gameSource) {
     GameSource.EPIC -> stringResource(R.string.tab_epic)
     GameSource.AMAZON -> stringResource(R.string.tab_amazon)
     GameSource.CUSTOM_GAME -> stringResource(R.string.library_source_custom)
+    else -> StoreAdapters.displayName(gameSource)
 }
 
 @Composable
@@ -1071,7 +1089,7 @@ private fun sourceContainerColor(gameSource: GameSource): Color = when (gameSour
     GameSource.STEAM -> MaterialTheme.colorScheme.primaryContainer
     GameSource.GOG -> MaterialTheme.colorScheme.tertiaryContainer
     GameSource.EPIC -> MaterialTheme.colorScheme.secondaryContainer
-    GameSource.AMAZON -> MaterialTheme.colorScheme.surfaceContainerHighest
+    GameSource.AMAZON, GameSource.EA, GameSource.UBISOFT -> MaterialTheme.colorScheme.surfaceContainerHighest
     GameSource.CUSTOM_GAME -> MaterialTheme.colorScheme.surfaceVariant
 }
 
@@ -1080,7 +1098,7 @@ private fun sourceContentColor(gameSource: GameSource): Color = when (gameSource
     GameSource.STEAM -> MaterialTheme.colorScheme.onPrimaryContainer
     GameSource.GOG -> MaterialTheme.colorScheme.onTertiaryContainer
     GameSource.EPIC -> MaterialTheme.colorScheme.onSecondaryContainer
-    GameSource.AMAZON -> MaterialTheme.colorScheme.onSurface
+    GameSource.AMAZON, GameSource.EA, GameSource.UBISOFT -> MaterialTheme.colorScheme.onSurface
     GameSource.CUSTOM_GAME -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 

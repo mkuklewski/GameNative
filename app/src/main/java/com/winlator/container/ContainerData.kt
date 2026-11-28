@@ -71,6 +71,7 @@ data class ContainerData(
     val hdrEnabled: Boolean = false,
     /** Gamescope output (`-W`/`-H`) resolution; [GamescopeSettings.OUTPUT_RESOLUTION_OFF] follows the container's General-tab screen size. */
     val gamescopeOutputResolution: String = GamescopeSettings.OUTPUT_RESOLUTION_DEFAULT,
+    val gamescopeGuestGl: String = GamescopeSettings.GUEST_GL_DEFAULT,
     val videoMemorySize: String = "2048",
     val mouseWarpOverride: String = "disable",
     val shaderBackend: String = "glsl",
@@ -117,6 +118,10 @@ data class ContainerData(
     val sharpnessLevel: Int = 100,
     val sharpnessDenoise: Int = 100,
     val vibrationIntensity: Int = 100,
+    // html5 input mode: "" = pack default, "native-controller", "pointer-with-tap-detection".
+    val inputMap: String = "",
+    // html5 DPR override. 0f (or less) = device-native.
+    val renderScale: Float = 0f,
     // LSFG Vulkan frame generation
     /** Whether LSFG frame generation is enabled for this container */
     val lsfgEnabled: Boolean = false,
@@ -188,6 +193,7 @@ data class ContainerData(
                     "useDRI3" to state.useDRI3,
                     "hdrEnabled" to state.hdrEnabled,
                     "gamescopeOutputResolution" to state.gamescopeOutputResolution,
+                    "gamescopeGuestGl" to state.gamescopeGuestGl,
                     "language" to state.language,
                     "forceDlc" to state.forceDlc,
                     "localSavesOnly" to state.localSavesOnly,
@@ -203,6 +209,8 @@ data class ContainerData(
                     "sharpnessLevel" to state.sharpnessLevel,
                     "sharpnessDenoise" to state.sharpnessDenoise,
                     "vibrationIntensity" to state.vibrationIntensity,
+                    "inputMap" to state.inputMap,
+                    "renderScale" to state.renderScale,
                     "lsfgEnabled" to state.lsfgEnabled,
                     "windowsVrEnabled" to state.windowsVrEnabled,
                     "openCompositeEnabled" to state.openCompositeEnabled,
@@ -272,6 +280,8 @@ data class ContainerData(
                     hdrEnabled = (savedMap["hdrEnabled"] as? Boolean) ?: false,
                     gamescopeOutputResolution = (savedMap["gamescopeOutputResolution"] as? String)
                         ?: GamescopeSettings.OUTPUT_RESOLUTION_DEFAULT,
+                    gamescopeGuestGl = (savedMap["gamescopeGuestGl"] as? String)
+                        ?: GamescopeSettings.GUEST_GL_DEFAULT,
                     language = (savedMap["language"] as? String) ?: "english",
                     forceDlc = (savedMap["forceDlc"] as? Boolean) ?: false,
                     localSavesOnly = (savedMap["localSavesOnly"] as? Boolean) ?: false,
@@ -287,6 +297,8 @@ data class ContainerData(
                     sharpnessLevel = (savedMap["sharpnessLevel"] as? Int) ?: 100,
                     sharpnessDenoise = (savedMap["sharpnessDenoise"] as? Int) ?: 100,
                     vibrationIntensity = (savedMap["vibrationIntensity"] as? Int) ?: 100,
+                    inputMap = (savedMap["inputMap"] as? String) ?: "",
+                    renderScale = (savedMap["renderScale"] as? Float) ?: 0f,
                     lsfgEnabled = (savedMap["lsfgEnabled"] as? Boolean) ?: false,
                     windowsVrEnabled = (savedMap["windowsVrEnabled"] as? Boolean) ?: false,
                     openCompositeEnabled = (savedMap["openCompositeEnabled"] as? Boolean) ?: false,

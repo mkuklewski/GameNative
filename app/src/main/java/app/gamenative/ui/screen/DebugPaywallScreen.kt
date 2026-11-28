@@ -23,12 +23,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -38,9 +34,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.gamenative.R
+import app.gamenative.ui.screen.support.basicPlanBody
+import app.gamenative.ui.screen.support.proPlanBody
 import app.gamenative.ui.component.BenefitCard
 import app.gamenative.ui.component.FocusScaleBackButton
 import app.gamenative.ui.component.HeroBadge
+import app.gamenative.ui.component.focusOnOpen
 import app.gamenative.ui.theme.PluviaTheme
 
 @Composable
@@ -134,20 +133,20 @@ fun DebugPaywallScreen(
 
                 BenefitCard(
                     title = stringResource(R.string.debug_paywall_tier5_title),
-                    body = stringResource(R.string.debug_paywall_tier5_body),
+                    body = basicPlanBody(),
                     icon = Icons.Default.SmartToy,
                     iconTint = PluviaTheme.colors.accentCyan,
                 )
 
                 BenefitCard(
                     title = stringResource(R.string.debug_paywall_tier10_title),
-                    body = stringResource(R.string.debug_paywall_tier10_body),
+                    body = proPlanBody(),
                     icon = Icons.Rounded.AutoAwesome,
                     iconTint = PluviaTheme.colors.accentWarning,
                 )
 
                 Text(
-                    text = stringResource(R.string.debug_paywall_cancel_anytime) + " " + stringResource(R.string.debug_trial_note),
+                    text = stringResource(R.string.debug_paywall_cancel_anytime),
                     style = MaterialTheme.typography.bodySmall,
                     color = PluviaTheme.colors.textMuted,
                 )
@@ -159,14 +158,11 @@ fun DebugPaywallScreen(
                     color = PluviaTheme.colors.textMuted,
                 )
 
-                val subscribeFocusRequester = remember { FocusRequester() }
-                LaunchedEffect(Unit) { runCatching { subscribeFocusRequester.requestFocus() } }
-
                 Button(
                     onClick = onSubscribe,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .focusRequester(subscribeFocusRequester),
+                        .focusOnOpen(),
                 ) {
                     Text(stringResource(R.string.support_see_plans))
                 }

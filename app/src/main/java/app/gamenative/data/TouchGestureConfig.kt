@@ -85,6 +85,8 @@ data class TouchGestureConfig(
     val holdDragEnabled: Boolean = false,
     val holdDragAction: String = PAN_LEFT_CLICK_DRAG,
     val holdDragDelay: Int = DEFAULT_DELAY_MS,
+    // html5-only (touch.js shim). "absolute" = dispatch at finger coords; "relative" = synthetic cursor.
+    val cursorMode: String = CURSOR_MODE_ABSOLUTE,
 ) {
 
     // ── Serialisation ────────────────────────────────────────────────────
@@ -136,6 +138,8 @@ data class TouchGestureConfig(
             put(KEY_HOLD_DRAG_ENABLED, holdDragEnabled)
             put(KEY_HOLD_DRAG_ACTION, holdDragAction)
             put(KEY_HOLD_DRAG_DELAY, holdDragDelay)
+            // absent key = absolute, so wine gesture JSON stays as it was.
+            if (cursorMode != CURSOR_MODE_ABSOLUTE) put(KEY_CURSOR_MODE, cursorMode)
         }.toString()
     }
 
@@ -168,6 +172,8 @@ data class TouchGestureConfig(
         const val DEFAULT_ACTION_SEQUENCE_DELAY_MS = 150
         const val MIN_ACTION_SEQUENCE_DELAY_MS = 80
         const val MAX_ACTION_SEQUENCE_DELAY_MS = 1000
+        // html5-only: the touch.js shim opens the in-game overlay.
+        const val ACTION_OPEN_QUICK_MENU = "open_quick_menu"
 
         // ── Action identifiers: two-finger drag (pan) ───────────────────
         const val PAN_WASD = "wasd"
@@ -183,6 +189,9 @@ data class TouchGestureConfig(
         const val ZOOM_SCROLL_WHEEL = "scroll_wheel"
         const val ZOOM_PLUS_MINUS = "plus_minus"
         const val ZOOM_PAGE_UP_DOWN = "page_up_down"
+
+        const val CURSOR_MODE_ABSOLUTE = "absolute"
+        const val CURSOR_MODE_RELATIVE = "relative"
 
         // ── JSON keys ────────────────────────────────────────────────────
         private const val KEY_TAP_ENABLED = "tapEnabled"
@@ -226,6 +235,7 @@ data class TouchGestureConfig(
         private const val KEY_HOLD_DRAG_ENABLED = "holdDragEnabled"
         private const val KEY_HOLD_DRAG_ACTION = "holdDragAction"
         private const val KEY_HOLD_DRAG_DELAY = "holdDragDelay"
+        private const val KEY_CURSOR_MODE = "cursorMode"
 
         /**
          * Compatibility-safe defaults for existing (pre-overhaul) configs.
@@ -241,9 +251,18 @@ data class TouchGestureConfig(
             threeFingerHoldEnabled = false,
         )
 
+        // show_keyboard isn't actionable in the WebView, so 3-finger-tap opens the quick menu instead.
+        fun html5Defaults(): TouchGestureConfig = compatibilityDefaults().copy(
+            threeFingerTapAction = ACTION_OPEN_QUICK_MENU,
+        )
+
         /** Parse from a JSON string. Returns compatibility-safe defaults when the string is null, blank or invalid. */
-        fun fromJson(json: String?): TouchGestureConfig {
-            if (json.isNullOrBlank()) return compatibilityDefaults()
+        // [defaults] lets html5 pass html5Defaults(); threeFingerTapAction is the one field where they differ.
+        fun fromJson(
+            json: String?,
+            defaults: TouchGestureConfig = compatibilityDefaults(),
+        ): TouchGestureConfig {
+            if (json.isNullOrBlank()) return defaults
             return try {
                 val obj = JSONObject(json)
                 TouchGestureConfig(
@@ -280,7 +299,7 @@ data class TouchGestureConfig(
                     ),
                     twoFingerHoldDelay = obj.optInt(KEY_TWO_FINGER_HOLD_DELAY, DEFAULT_DELAY_MS),
                     threeFingerTapEnabled = obj.optBoolean(KEY_THREE_FINGER_TAP_ENABLED, false),
-                    threeFingerTapAction = obj.optString(KEY_THREE_FINGER_TAP_ACTION, ACTION_SHOW_KEYBOARD),
+                    threeFingerTapAction = obj.optString(KEY_THREE_FINGER_TAP_ACTION, defaults.threeFingerTapAction),
                     threeFingerDragEnabled = obj.optBoolean(KEY_THREE_FINGER_DRAG_ENABLED, false),
                     threeFingerDragAction = obj.optString(KEY_THREE_FINGER_DRAG_ACTION, PAN_ARROW_KEYS),
                     threeFingerHoldEnabled = obj.optBoolean(KEY_THREE_FINGER_HOLD_ENABLED, false),
@@ -301,9 +320,10 @@ data class TouchGestureConfig(
                     holdDragAction = obj.optString(KEY_HOLD_DRAG_ACTION, PAN_LEFT_CLICK_DRAG)
                         .takeIf { it in PAN_ACTIONS } ?: PAN_LEFT_CLICK_DRAG,
                     holdDragDelay = obj.optInt(KEY_HOLD_DRAG_DELAY, DEFAULT_DELAY_MS),
+                    cursorMode = obj.optString(KEY_CURSOR_MODE, CURSOR_MODE_ABSOLUTE),
                 )
             } catch (_: Exception) {
-                compatibilityDefaults()
+                defaults
             }
         }
 

@@ -1,5 +1,6 @@
 package app.gamenative.service.download
 
+import app.gamenative.service.store.StoreGames
 import app.gamenative.data.DepotInfo
 import app.gamenative.service.PicsAppInfo.resolveAppKeyValues
 import app.gamenative.R
@@ -876,6 +877,7 @@ object GameDownloadService {
         val dlcGameIds: List<Int>,
         val installPath: String?,
         val containerLanguage: String?,
+        val dlcOnly: Boolean = false,
     )
 
     @Volatile
@@ -924,6 +926,7 @@ object GameDownloadService {
         dlcGameIds: List<Int> = emptyList(),
         installPath: String? = null,
         containerLanguage: String? = null,
+        dlcOnly: Boolean = false,
     ) {
         val key = makeKey(gameSource, gameId)
 
@@ -945,7 +948,8 @@ object GameDownloadService {
                 downloadInfo = downloadInfo,
                 dlcGameIds = dlcGameIds,
                 installPath = installPath,
-                containerLanguage = containerLanguage
+                containerLanguage = containerLanguage,
+                dlcOnly = dlcOnly,
             )
 
             // Add to the queue if it is not there
@@ -1016,6 +1020,12 @@ object GameDownloadService {
         queueScope.launch { resumeNextDownload(context.applicationContext) }
     }
 
+    /** DLC ids and DLC-only flag remembered for a paused or queued download, lost when the app is killed. */
+    fun rememberedDlcSelection(gameSource: GameSource, gameId: String): Pair<List<Int>, Boolean>? =
+        synchronized(queueLock) {
+            registeredDownloads[makeKey(gameSource, gameId)]?.let { it.dlcGameIds to it.dlcOnly }
+        }
+
     /**
      * Remove download when pressing delete button
      * Should only be called by Each Service once (4 callees)
@@ -1085,10 +1095,12 @@ object GameDownloadService {
                     appId = nextEntry.gameId.toInt(),
                     dlcGameIds = nextEntry.dlcGameIds,
                     installPath = nextEntry.installPath!!,
-                    containerLanguage = nextEntry.containerLanguage!!
+                    containerLanguage = nextEntry.containerLanguage!!,
+                    dlcOnly = nextEntry.dlcOnly,
                 )
                 // Do Nothing for Custom Game
                 GameSource.CUSTOM_GAME -> {}
+                else -> nextEntry.gameId.toIntOrNull()?.let { StoreGames.download(context, it) }
             }
         }
     }

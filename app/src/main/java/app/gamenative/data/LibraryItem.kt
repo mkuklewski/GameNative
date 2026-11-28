@@ -3,13 +3,27 @@ package app.gamenative.data
 import app.gamenative.Constants
 import app.gamenative.utils.CustomGameScanner
 
-enum class GameSource {
-    STEAM,
-    CUSTOM_GAME,
-    GOG,
-    EPIC,
-    AMAZON
-    // Add other platforms here..
+enum class GameSource(val containerPrefix: String) {
+    STEAM("STEAM_"),
+    CUSTOM_GAME("CUSTOM_GAME_"),
+    GOG("GOG_"),
+    EPIC("EPIC_"),
+    AMAZON("AMAZON_"),
+    EA("EA_"),
+    UBISOFT("UBISOFT_"),
+    ;
+
+    // the container id prefix scheme (<containerPrefix><numericId>, e.g. "STEAM_440") lives ONLY here.
+    fun matches(containerId: String): Boolean = containerId.startsWith(containerPrefix)
+    fun idOf(containerId: String): String = containerId.removePrefix(containerPrefix)
+
+    companion object {
+        fun fromContainerId(containerId: String): GameSource? =
+            entries.firstOrNull { it.matches(containerId) }
+        // whole string if no known prefix.
+        fun idPart(containerId: String): String =
+            fromContainerId(containerId)?.idOf(containerId) ?: containerId
+    }
 }
 
 enum class GameCompatibilityStatus {
@@ -29,6 +43,8 @@ data class LibraryItem(
     val capsuleImageUrl: String = "",
     val headerImageUrl: String = "",
     val heroImageUrl: String = "",
+    /** Drawn over [headerImageUrl] on landscape cards when that art carries no title. */
+    val logoImageUrl: String = "",
     val gridHeroImageScale: Float = 1f,
     val isShared: Boolean = false,
     val gameSource: GameSource = GameSource.STEAM,
@@ -75,12 +91,7 @@ data class LibraryItem(
                     "${GOGGame.GOG_IMAGE_BASE_URL}/$iconHash"
                 }
             }
-            GameSource.EPIC -> {
-                iconHash
-            }
-            GameSource.AMAZON -> {
-                iconHash
-            }
+            GameSource.EPIC, GameSource.AMAZON, GameSource.EA, GameSource.UBISOFT -> iconHash
         }
 
     /** Numeric game ID extracted from the source-prefixed appId; returns 0 if parsing fails. */

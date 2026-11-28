@@ -5,6 +5,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.FocusInteraction
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -32,9 +35,11 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Image
@@ -80,13 +85,16 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -97,6 +105,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import app.gamenative.ui.component.FocusOnOpen
 import app.gamenative.ui.component.PluviaSwitch
 import app.gamenative.PrefManager
 import app.gamenative.R
@@ -112,9 +121,11 @@ import app.gamenative.theme.ThemeManager
 import app.gamenative.theme.ThemeOption
 import app.gamenative.ui.component.ThemedOutlinedButton
 import app.gamenative.ui.component.ThemedSlider
+import app.gamenative.ui.component.focusRing
 import app.gamenative.ui.theme.MenuColorScope
 import app.gamenative.ui.theme.PluviaTheme
 import app.gamenative.ui.component.NoExtractOutlinedTextField
+import app.gamenative.ui.component.RingTextButton
 import app.gamenative.ui.component.QuickMenuTickSlider
 import app.gamenative.ui.component.dialog.AccountSignInDialog
 import app.gamenative.ui.component.topbar.BackButton
@@ -123,7 +134,6 @@ import app.gamenative.ui.theme.ThemedDropdownMenu
 import app.gamenative.ui.theme.ThemedDropdownMenuItem
 import app.gamenative.ui.theme.themedFocusRow
 import app.gamenative.ui.theme.themedRowFocus
-import app.gamenative.ui.util.NavigateSoundOnFocusGain
 import app.gamenative.ui.util.TabSoundOnChange
 import com.skydoves.landscapist.ImageOptions
 import com.skydoves.landscapist.coil.CoilImage
@@ -211,6 +221,11 @@ fun ThemeManagerDialog(
     val signedIn = signedInPref && ThemeManager.isSignedIn
     var shareTarget by remember { mutableStateOf<InstalledTheme?>(null) }
     var shareBlocked by remember { mutableStateOf<ShareBlocker?>(null) }
+    var newThemeOpen by remember { mutableStateOf(false) }
+    var renameTarget by remember { mutableStateOf<InstalledTheme?>(null) }
+    var sharePickerOpen by remember { mutableStateOf(false) }
+    var scrollTo by remember { mutableStateOf<String?>(null) }
+    var focusRow by remember { mutableStateOf<String?>(null) }
     var reportTarget by remember { mutableStateOf<CommunityTheme?>(null) }
     var communityDeleteTarget by remember { mutableStateOf<CommunityTheme?>(null) }
     var signInNeeded by remember { mutableStateOf(false) }
@@ -417,7 +432,9 @@ fun ThemeManagerDialog(
             dismissOnClickOutside = false,
         ),
     ) {
+        var dialogHasFocus by remember { mutableStateOf(false) }
         Scaffold(
+            modifier = Modifier.onFocusChanged { dialogHasFocus = it.hasFocus },
             topBar = {
                 CenterAlignedTopAppBar(
                     title = { Text(text = stringResource(R.string.themes_title)) },
@@ -432,11 +449,16 @@ fun ThemeManagerDialog(
                     .padding(paddingValues),
             ) {
                 val tabFocusRequester = remember { FocusRequester() }
+                FocusOnOpen(tabFocusRequester)
+                // back from a sub-dialog: the tab takes focus only if the item that opened it is gone
                 val isWindowFocused = LocalWindowInfo.current.isWindowFocused
+                val inputModeManager = LocalInputModeManager.current
                 LaunchedEffect(isWindowFocused) {
-                    if (isWindowFocused) {
+                    if (isWindowFocused && !dialogHasFocus) {
                         delay(100)
-                        runCatching { tabFocusRequester.requestFocus() }
+                        if (!dialogHasFocus && inputModeManager.inputMode == InputMode.Keyboard) {
+                            runCatching { tabFocusRequester.requestFocus() }
+                        }
                     }
                 }
 
@@ -470,6 +492,15 @@ fun ThemeManagerDialog(
                         busy = busy,
                         expanded = expanded,
                         updating = updating,
+                        scrollTo = scrollTo,
+                        onScrolled = {
+                            focusRow = scrollTo
+                            scrollTo = null
+                        },
+                        focusRow = focusRow,
+                        onRowFocused = { focusRow = null },
+                        onNewTheme = { newThemeOpen = true },
+                        onRename = { renameTarget = it },
                         onUpdate = { updateTheme(it) },
                         onImportZip = {
                             SteamService.isImporting = true
@@ -525,11 +556,12 @@ fun ThemeManagerDialog(
                         onInstall = { installFromCommunity(it) },
                         onReport = { theme -> requireSignIn { reportTarget = theme } },
                         onDelete = { communityDeleteTarget = it },
+                        onShareTheme = { sharePickerOpen = true },
                     )
 
                     ThemeTab.STEAM_DECK -> BrowseThemesTab(
                         store = store,
-                        installedByName = themes.associateBy { it.name.lowercase(Locale.ROOT) },
+                        installedByName = themes.filter { !it.custom }.associateBy { it.name.lowercase(Locale.ROOT) },
                         updating = updating,
                         onSearch = { loadStore(reset = true) },
                         onLoadMore = { loadStore(reset = false) },
@@ -551,14 +583,17 @@ fun ThemeManagerDialog(
                 title = { Text(stringResource(R.string.themes_delete_title)) },
                 text = { Text(stringResource(R.string.themes_delete_message, target.name)) },
                 confirmButton = {
-                    TextButton(onClick = {
+                    RingTextButton(onClick = {
                         deleteTarget = null
                         expanded.remove(target.id)
+                        // the row goes away: focus moves to the row that takes its place
+                        val index = themes.indexOfFirst { it.id == target.id }
+                        focusRow = (themes.getOrNull(index + 1) ?: themes.getOrNull(index - 1))?.id
                         runAction { ThemeManager.delete(target.id) }
                     }) { Text(stringResource(R.string.delete)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { deleteTarget = null }) { Text(stringResource(R.string.cancel)) }
+                    RingTextButton(onClick = { deleteTarget = null }) { Text(stringResource(R.string.cancel)) }
                 },
             )
             }
@@ -575,12 +610,63 @@ fun ThemeManagerDialog(
                         shared.name,
                     )
                     scope.launch { snackbarHostState.showSnackbar(message) }
+                    if (community.loaded) loadCommunity(reset = true)
                 },
             )
         }
 
         shareBlocked?.let { blocker ->
             ShareBlockedDialog(blocker = blocker, onDismiss = { shareBlocked = null })
+        }
+
+        if (newThemeOpen) {
+            ThemeNameDialog(
+                title = stringResource(R.string.themes_new_theme),
+                initial = "",
+                confirmLabel = stringResource(R.string.create),
+                onDismiss = { newThemeOpen = false },
+                onConfirm = { name ->
+                    newThemeOpen = false
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) { ThemeManager.createCustom(name) }
+                        result.onSuccess {
+                            tab = ThemeTab.INSTALLED
+                            if (it.id !in expanded) expanded.add(it.id)
+                            scrollTo = it.id
+                        }.onFailure { snackbarHostState.showSnackbar(failureText(it)) }
+                    }
+                },
+            )
+        }
+
+        renameTarget?.let { target ->
+            ThemeNameDialog(
+                title = stringResource(R.string.themes_rename),
+                initial = target.name,
+                confirmLabel = stringResource(R.string.save),
+                onDismiss = { renameTarget = null },
+                onConfirm = { name ->
+                    renameTarget = null
+                    runAction { ThemeManager.rename(target.id, name) }
+                },
+            )
+        }
+
+        if (sharePickerOpen) {
+            ShareThemePickerDialog(
+                // themes made here come first
+                themes = themes.filter { ThemeManager.shareBlocker(it.id) == null }.sortedByDescending { it.custom },
+                onDismiss = { sharePickerOpen = false },
+                onPick = {
+                    sharePickerOpen = false
+                    startShare(it)
+                },
+                onNewTheme = {
+                    sharePickerOpen = false
+                    tab = ThemeTab.INSTALLED
+                    newThemeOpen = true
+                },
+            )
         }
 
         reportTarget?.let { target ->
@@ -656,21 +742,32 @@ fun ThemeManagerDialog(
     }
 }
 
+/**
+ * The focus ring around this element while it or anything inside it has controller focus, plus the theme's focused-row
+ * fill. Pass [ring] = false for elements that draw the ring themselves (ThemedOutlinedButton, ThemedSlider).
+ */
 @Composable
-internal fun Modifier.focusOutline(shape: Shape = RoundedCornerShape(12.dp)): Modifier {
+internal fun Modifier.focusOutline(shape: Shape = RoundedCornerShape(12.dp), ring: Boolean = true): Modifier {
     var focused by remember { mutableStateOf(false) }
-    NavigateSoundOnFocusGain(focused)
-    val color = MaterialTheme.colorScheme.primary
-    val rowFocus = themedRowFocus()
+    val rowFocus = themedRowFocus()?.copy(ring = null)
+    val source = remember { MutableInteractionSource() }
+    // keyboard only: some wrapped elements are focused in code when a dialog opens, also for touch users
+    val ringed = if (ring) Modifier.focusRing(source, shape, width = 2.dp, keyboardOnly = true) else Modifier
+    // feeds hasFocus (which counts children) to the ring; registered after the ring's collector so none is missed
+    var held by remember { mutableStateOf<FocusInteraction.Focus?>(null) }
+    LaunchedEffect(focused) {
+        val current = held
+        if (focused && current == null) {
+            held = FocusInteraction.Focus().also { source.emit(it) }
+        } else if (!focused && current != null) {
+            held = null
+            source.emit(FocusInteraction.Unfocus(current))
+        }
+    }
     return this
         .onFocusChanged { focused = it.hasFocus }
-        .then(
-            when {
-                rowFocus != null -> Modifier.themedFocusRow(rowFocus, focused, shape)
-                focused -> Modifier.border(2.dp, color, shape)
-                else -> Modifier
-            },
-        )
+        .then(if (rowFocus != null) Modifier.themedFocusRow(rowFocus, focused, shape) else Modifier)
+        .then(ringed)
 }
 
 /**
@@ -721,7 +818,7 @@ internal fun RowActionButton(
 internal fun LoadMoreButton(loading: Boolean, onClick: () -> Unit) {
     ThemedOutlinedButton(
         onClick = { if (!loading) onClick() },
-        modifier = Modifier.focusOutline(CircleShape),
+        modifier = Modifier.focusOutline(CircleShape, ring = false),
     ) {
         if (loading) {
             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -739,6 +836,12 @@ private fun InstalledThemesTab(
     busy: Boolean,
     expanded: List<String>,
     updating: List<String>,
+    scrollTo: String?,
+    onScrolled: () -> Unit,
+    focusRow: String?,
+    onRowFocused: () -> Unit,
+    onNewTheme: () -> Unit,
+    onRename: (InstalledTheme) -> Unit,
     onUpdate: (String) -> Unit,
     onImportZip: () -> Unit,
     onImportFolder: () -> Unit,
@@ -750,8 +853,18 @@ private fun InstalledThemesTab(
     onEditColor: (String, ThemeOption.Color) -> Unit,
     onPickFile: (String, String) -> Unit,
 ) {
+    val listState = rememberLazyListState()
+    // a new theme is first in the list: bring its row into view
+    LaunchedEffect(scrollTo, themes) {
+        val index = themes.indexOfFirst { it.id == scrollTo }
+        if (index >= 0) {
+            listState.scrollToItem(index + if (themesListed) 1 else 2)
+            onScrolled()
+        }
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -761,6 +874,15 @@ private fun InstalledThemesTab(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                Button(
+                    onClick = onNewTheme,
+                    enabled = !busy,
+                    modifier = Modifier.focusOutline(CircleShape),
+                ) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(stringResource(R.string.themes_new_theme))
+                }
                 Button(
                     onClick = onImportZip,
                     enabled = !busy,
@@ -774,7 +896,7 @@ private fun InstalledThemesTab(
                 ThemedOutlinedButton(
                     onClick = onCreateStarter,
                     enabled = !busy,
-                    modifier = Modifier.focusOutline(CircleShape),
+                    modifier = Modifier.focusOutline(CircleShape, ring = false),
                 ) { Text(stringResource(R.string.themes_create_starter)) }
             }
             if (busy) {
@@ -808,15 +930,19 @@ private fun InstalledThemesTab(
         itemsIndexed(themes, key = { _, theme -> theme.id }) { index, theme ->
             InstalledThemeCard(
                 theme = theme,
-                isFirst = index == 0,
-                isLast = index == themes.lastIndex,
+                // the arrows move a theme inside its group: the themes made here, then the others
+                isFirst = themes.getOrNull(index - 1)?.custom != theme.custom,
+                isLast = themes.getOrNull(index + 1)?.custom != theme.custom,
                 isExpanded = theme.id in expanded,
                 isUpdating = theme.id in updating,
+                takeFocus = theme.id == focusRow,
+                onFocusTaken = onRowFocused,
                 onUpdate = { onUpdate(theme.id) },
                 onToggleExpanded = { onToggleExpanded(theme.id) },
                 onAction = onAction,
                 onDelete = { onDelete(theme) },
                 onShare = { onShare(theme) },
+                onRename = { onRename(theme) },
                 onEditColor = { onEditColor(theme.id, it) },
                 onPickFile = { key -> onPickFile(theme.id, key) },
             )
@@ -839,6 +965,7 @@ private fun changesText(fields: List<String>): String {
     return stringResource(R.string.themes_changes, (words.ifEmpty { fields }).joinToString(", "))
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun InstalledThemeCard(
     theme: InstalledTheme,
@@ -846,11 +973,14 @@ private fun InstalledThemeCard(
     isLast: Boolean,
     isExpanded: Boolean,
     isUpdating: Boolean,
+    takeFocus: Boolean,
+    onFocusTaken: () -> Unit,
     onUpdate: () -> Unit,
     onToggleExpanded: () -> Unit,
     onAction: (suspend () -> Unit) -> Unit,
     onDelete: () -> Unit,
     onShare: () -> Unit,
+    onRename: () -> Unit,
     onEditColor: (ThemeOption.Color) -> Unit,
     onPickFile: (String) -> Unit,
 ) {
@@ -864,11 +994,116 @@ private fun InstalledThemeCard(
     }
     val optionGroups = remember(visibleOptions) { groupOptions(visibleOptions) }
     var openSections by remember(theme.id) { mutableStateOf(emptySet<String>()) }
+    // controller focus comes here after this theme was made, or after the row above or below it was deleted
+    val rowFocus = remember { FocusRequester() }
+    LaunchedEffect(takeFocus) {
+        if (takeFocus) {
+            runCatching { rowFocus.requestFocus() }
+            onFocusTaken()
+        }
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
+        // a narrow screen has no room for the buttons beside the name: they go on a second line
+        val narrow = LocalConfiguration.current.screenWidthDp < 600
+        val actions: @Composable () -> Unit = {
+            val newVersion = theme.updateAvailable
+            if (newVersion != null && !theme.custom) {
+                if (isUpdating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp)
+                            .size(20.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    TextButton(
+                        onClick = onUpdate,
+                        modifier = Modifier.focusOutline(CircleShape),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.themes_update_to, newVersion),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 160.dp),
+                        )
+                    }
+                }
+            }
+            if (visibleOptions.isNotEmpty()) {
+                TextButton(
+                    onClick = onToggleExpanded,
+                    modifier = Modifier
+                        .focusRequester(rowFocus)
+                        .focusOutline(CircleShape),
+                ) {
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                    )
+                    Text(text = stringResource(R.string.themes_options))
+                }
+            }
+            IconButton(
+                onClick = { onAction { ThemeManager.move(theme.id, up = true) } },
+                enabled = !isFirst,
+                modifier = Modifier.focusOutline(CircleShape),
+            ) {
+                Icon(Icons.Default.KeyboardArrowUp, contentDescription = stringResource(R.string.themes_move_up))
+            }
+            IconButton(
+                onClick = { onAction { ThemeManager.move(theme.id, up = false) } },
+                enabled = !isLast,
+                modifier = Modifier.focusOutline(CircleShape),
+            ) {
+                Icon(Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.themes_move_down))
+            }
+            if (theme.custom) {
+                // themes made here show Upload by name; the others keep the icon
+                TextButton(
+                    onClick = onShare,
+                    modifier = Modifier.focusOutline(CircleShape),
+                ) {
+                    Icon(imageVector = Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = stringResource(if (theme.sharedFromHere) R.string.themes_update else R.string.themes_share),
+                        maxLines = 1,
+                    )
+                }
+                IconButton(
+                    onClick = onRename,
+                    modifier = Modifier.focusOutline(CircleShape),
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.themes_rename))
+                }
+            } else {
+                IconButton(
+                    onClick = onShare,
+                    modifier = Modifier.focusOutline(CircleShape),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Upload,
+                        contentDescription = stringResource(
+                            if (theme.sharedFromHere) R.string.themes_share_update else R.string.themes_share,
+                        ),
+                    )
+                }
+            }
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.focusOutline(CircleShape),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = stringResource(R.string.delete),
+                    tint = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -880,7 +1115,7 @@ private fun InstalledThemeCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    val meta = if (theme.builtIn) {
+                    val meta = if (theme.custom) {
                         stringResource(R.string.themes_custom_subtitle)
                     } else {
                         listOfNotNull(
@@ -898,7 +1133,7 @@ private fun InstalledThemeCard(
                         )
                     }
                     if (theme.appliedFields.isEmpty()) {
-                        if (!theme.builtIn) {
+                        if (!theme.custom) {
                             Text(
                                 text = stringResource(R.string.themes_layout_only),
                                 style = MaterialTheme.typography.bodySmall,
@@ -934,84 +1169,18 @@ private fun InstalledThemeCard(
                         )
                     }
                 }
-                val newVersion = theme.updateAvailable
-                if (newVersion != null && !theme.builtIn) {
-                    if (isUpdating) {
-                        CircularProgressIndicator(
-                            modifier = Modifier
-                                .padding(horizontal = 12.dp)
-                                .size(20.dp),
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
-                        TextButton(
-                            onClick = onUpdate,
-                            modifier = Modifier.focusOutline(CircleShape),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.themes_update_to, newVersion),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.widthIn(max = 160.dp),
-                            )
-                        }
-                    }
-                }
-                if (visibleOptions.isNotEmpty()) {
-                    TextButton(
-                        onClick = onToggleExpanded,
-                        modifier = Modifier.focusOutline(CircleShape),
-                    ) {
-                        Icon(
-                            imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = null,
-                        )
-                        Text(text = stringResource(R.string.themes_options))
-                    }
-                }
-                IconButton(
-                    onClick = { onAction { ThemeManager.move(theme.id, up = true) } },
-                    enabled = !isFirst,
-                    modifier = Modifier.focusOutline(CircleShape),
-                ) {
-                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = stringResource(R.string.themes_move_up))
-                }
-                IconButton(
-                    onClick = { onAction { ThemeManager.move(theme.id, up = false) } },
-                    enabled = !isLast,
-                    modifier = Modifier.focusOutline(CircleShape),
-                ) {
-                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.themes_move_down))
-                }
-                IconButton(
-                    onClick = onShare,
-                    modifier = Modifier.focusOutline(CircleShape),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Upload,
-                        contentDescription = stringResource(
-                            if (theme.sharedFromHere) R.string.themes_share_update else R.string.themes_share,
-                        ),
-                    )
-                }
-                if (!theme.builtIn) {
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.focusOutline(CircleShape),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = stringResource(R.string.delete),
-                            tint = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
+                if (!narrow) actions()
                 Spacer(modifier = Modifier.width(4.dp))
                 PluviaSwitch(
                     checked = theme.enabled,
                     onCheckedChange = { checked -> onAction { ThemeManager.setEnabled(theme.id, checked) } },
-                    modifier = Modifier.focusOutline(CircleShape),
+                    modifier = Modifier
+                        .then(if (visibleOptions.isEmpty()) Modifier.focusRequester(rowFocus) else Modifier)
+                        .focusOutline(CircleShape),
                 )
+            }
+            if (narrow) {
+                FlowRow(modifier = Modifier.fillMaxWidth()) { actions() }
             }
 
             if (isExpanded && visibleOptions.isNotEmpty()) {
@@ -1168,7 +1337,7 @@ private fun FontOptionButtons(
 ) {
     ThemedOutlinedButton(
         onClick = { onPickFile(option.key) },
-        modifier = Modifier.focusOutline(CircleShape),
+        modifier = Modifier.focusOutline(CircleShape, ring = false),
     ) {
         Text(text = stringResource(R.string.themes_choose_font), maxLines = 1)
     }
@@ -1190,7 +1359,7 @@ private fun ColorOptionButton(
 ) {
     ThemedOutlinedButton(
         onClick = { onEditColor(option) },
-        modifier = Modifier.focusOutline(CircleShape),
+        modifier = Modifier.focusOutline(CircleShape, ring = false),
         contentPadding = if (compact) PaddingValues(horizontal = 12.dp) else ButtonDefaults.ContentPadding,
     ) {
         Box(
@@ -1216,7 +1385,7 @@ private fun ImageOptionButtons(
 ) {
     ThemedOutlinedButton(
         onClick = { onPickImage(option.key) },
-        modifier = Modifier.focusOutline(CircleShape),
+        modifier = Modifier.focusOutline(CircleShape, ring = false),
     ) {
         Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(modifier = Modifier.width(6.dp))
@@ -1276,7 +1445,7 @@ private fun ChoiceDropdown(
         Box {
             ThemedOutlinedButton(
                 onClick = { menuOpen = true },
-                modifier = Modifier.focusOutline(CircleShape),
+                modifier = Modifier.focusOutline(CircleShape, ring = false),
             ) {
                 Text(
                     text = option.selected,
@@ -1403,10 +1572,10 @@ private fun ColorPickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(argb) }) { Text(stringResource(R.string.ok)) }
+            RingTextButton(onClick = { onConfirm(argb) }) { Text(stringResource(R.string.ok)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            RingTextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
     }
@@ -1436,7 +1605,7 @@ private fun ColorSliderRow(
             valueRange = range,
             modifier = Modifier
                 .weight(1f)
-                .focusOutline(RoundedCornerShape(8.dp))
+                .focusOutline(RoundedCornerShape(8.dp), ring = false)
                 .onPreviewKeyEvent { event ->
                     // D-pad left and right step the slider, which does not take arrow keys on its own.
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false

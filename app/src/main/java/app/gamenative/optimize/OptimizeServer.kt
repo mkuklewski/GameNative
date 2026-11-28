@@ -1,5 +1,6 @@
 package app.gamenative.optimize
 
+import app.gamenative.utils.SessionVerdict
 import org.json.JSONObject
 
 /**
@@ -13,21 +14,44 @@ object OptimizeServer {
 
     const val BLOCK_SERVER = "server"
 
+    /** Seconds from a session's first frame after which the app asks the server about it and reports a step's outcome. */
+    const val ASK_PLAY_SEC = 180
+
+    /** [ASK_PLAY_SEC] in a session's gameplay_s, which counts from [SessionVerdict.WARMUP_SEC] after the first frame. */
+    const val ASK_GAMEPLAY_SEC = ASK_PLAY_SEC - SessionVerdict.WARMUP_SEC
+
     /** The verdict blocks the server is still asked about at exit; a short session never is. */
     val ASKED_BLOCKS = setOf(OptimizeCards.SUPPRESSED_NOT_CONFIDENT, OptimizeCards.SUPPRESSED_CLASS)
+
+    /** The verdict blocks a [throttledSession] asks the server about at exit. */
+    val THROTTLED_ASKED_BLOCKS = ASKED_BLOCKS + OptimizeCards.SUPPRESSED_RAN_FINE
+
+    /** A session long enough to ask about in which the device throttled. */
+    fun throttledSession(session: Metrics): Boolean =
+        session.throttleOnsetSec != null && session.gameplaySec >= ASK_GAMEPLAY_SEC
 
     /** Marks a game asked at exit while no rules build was known yet. */
     const val UNKNOWN_RULES = "unknown"
 
     /**
      * Whether the exit dry-run is sent for a session the local rules would [localBlock]. Always when nothing blocks
-     * it. For an unsure or unlisted verdict only after [gameplaySec] of real play, with no [userHold], and once per
+     * it. For an unsure or unlisted verdict only from [ASK_GAMEPLAY_SEC] of [gameplaySec], with no [userHold], and once per
      * rules build: [askedRulesVersion] is the build this game was last asked under, [rulesVersion] the current one.
+     * A [throttledSession] also asks for a session that ran fine, and at every exit.
      */
-    fun asksAtExit(localBlock: String?, gameplaySec: Int, userHold: String?, askedRulesVersion: String?, rulesVersion: String?): Boolean = when {
+    fun asksAtExit(
+        localBlock: String?,
+        gameplaySec: Int,
+        userHold: String?,
+        askedRulesVersion: String?,
+        rulesVersion: String?,
+        throttled: Boolean = false,
+    ): Boolean = when {
         localBlock == null -> true
-        localBlock !in ASKED_BLOCKS || userHold != null -> false
-        gameplaySec < OptimizeCards.MIN_GAMEPLAY_SEC -> false
+        userHold != null -> false
+        throttled && localBlock in THROTTLED_ASKED_BLOCKS -> true
+        localBlock !in ASKED_BLOCKS -> false
+        gameplaySec < ASK_GAMEPLAY_SEC -> false
         else -> askedRulesVersion != (rulesVersion ?: UNKNOWN_RULES)
     }
 

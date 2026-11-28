@@ -1,5 +1,6 @@
 package app.gamenative.ui.model
 
+import app.gamenative.service.store.StoreGames
 import android.content.Context
 import android.os.Process
 import androidx.lifecycle.SavedStateHandle
@@ -36,6 +37,7 @@ import app.gamenative.ui.data.MainState
 import app.gamenative.ui.enums.ConnectionState
 import app.gamenative.ui.screen.PluviaScreen
 import app.gamenative.ui.screen.support.SupportAppliedRun
+import app.gamenative.utils.BootProgress
 import app.gamenative.utils.ContainerUtils
 import app.gamenative.utils.DebugReportUtils
 import app.gamenative.utils.DebugRunParamsHolder
@@ -284,6 +286,7 @@ class MainViewModel @Inject constructor(
 
     private val onSetBootingSplashText: (AndroidEvent.SetBootingSplashText) -> Unit = {
         setBootingSplashText(it.text)
+        _state.update { state -> state.copy(bootingSplashProgress = it.progress) }
         if (!_state.value.alreadyClearedBootingSplash)
             setShowBootingSplash(true)
     }
@@ -297,6 +300,7 @@ class MainViewModel @Inject constructor(
     private val onGamescopeGameContent: (AndroidEvent.GamescopeGameContent) -> Unit = {
         if (!gameWindowSeen) Timber.i("gamescope session published game content; counting the game window as seen")
         gameWindowSeen = true
+        announceGamescopeGameToSteam()
     }
 
     private val onClearBootingSplash: (AndroidEvent.ClearBootingSplash) -> Unit = {
@@ -390,6 +394,7 @@ class MainViewModel @Inject constructor(
         PluviaApp.events.off<SteamEvent.LoggedOut, Unit>(onLoggedOut)
         PluviaApp.events.off<AndroidEvent.ServiceReady, Unit>(onServiceReady)
         connectionTimeoutJob?.cancel()
+        BootProgress.stop()
     }
 
     fun setTheme(value: AppTheme) {
@@ -421,6 +426,8 @@ class MainViewModel @Inject constructor(
     }
 
     fun setShowBootingSplash(value: Boolean) {
+        // Single choke point for every dismissal path, so boot reporting can never outlive the splash.
+        if (!value) BootProgress.stop()
         val wasShowing = _state.value.showBootingSplash
         if (value && !wasShowing) {
             // The splash hides and re-shows between boot phases; a quick re-show is the same
@@ -467,11 +474,11 @@ class MainViewModel @Inject constructor(
             }
             // bootAd stays in state so the exit fade keeps rendering it; the next show replaces it.
             PluviaApp.isBootingSplashShowing = false
-            _state.update { it.copy(showBootingSplash = false, alreadyClearedBootingSplash = true) }
+            _state.update { it.copy(showBootingSplash = false, alreadyClearedBootingSplash = true, bootingSplashProgress = MainState().bootingSplashProgress) }
         } else {
             PluviaApp.isBootingSplashShowing = value
             if (!value) {
-                _state.update { it.copy(showBootingSplash = false, alreadyClearedBootingSplash = true) }
+                _state.update { it.copy(showBootingSplash = false, alreadyClearedBootingSplash = true, bootingSplashProgress = MainState().bootingSplashProgress) }
             } else {
                 _state.update { it.copy(showBootingSplash = true) }
             }
@@ -662,6 +669,18 @@ class MainViewModel @Inject constructor(
             if (bootAwaitingGameWindow) startBootGameExitWatch(context, appId)
             PluviaApp.events.emit(AndroidEvent.SetAllowedOrientation(PrefManager.allowedOrientation))
 
+            // html5 dismisses the splash here: there's no onWindowMapped equivalent. Open Container FORCES
+            // wine prep even for html5 so the user can browse saves in the wine file manager.
+            val forceWineForOpenContainer = _state.value.bootToContainer
+            if (!forceWineForOpenContainer &&
+                withContext(Dispatchers.IO) { app.gamenative.html5.host.Html5Routing.isHtml5App(context, appId) }
+            ) {
+                delay(100)
+                _uiEvent.send(MainUiEvent.LaunchApp)
+                setShowBootingSplash(false)
+                return@launch
+            }
+
             val heroUrl = withContext(Dispatchers.IO) {
                 val gameSource = ContainerUtils.extractGameSourceFromContainerId(appId)
                 val gameId = ContainerUtils.extractGameIdFromContainerId(appId)
@@ -682,6 +701,7 @@ class MainViewModel @Inject constructor(
                         val game = AmazonService.getAmazonGameByAppId(gameId)
                         game?.heroUrl?.ifEmpty { game.artUrl } ?: ""
                     }
+                    GameSource.EA, GameSource.UBISOFT -> StoreGames.game(gameId)?.let { it.heroUrl.ifEmpty { it.coverUrl } }.orEmpty()
                     GameSource.CUSTOM_GAME -> {
                         val folderPath = CustomGameScanner.getFolderPathFromAppId(appId) ?: return@withContext ""
                         val folder = java.io.File(folderPath)
@@ -767,6 +787,7 @@ class MainViewModel @Inject constructor(
                 ActiveGameRegistry.clearIfMatches(gameId)
                 SteamService.notifyRunningProcesses()
 
+                val steamHostFailure = app.gamenative.ui.screen.xserver.SteamHostStatusWatch.takeFailure()
                 val debugRun = _state.value.debugRun
                 if (debugRun) {
                     setDebugRun(false)
@@ -778,7 +799,7 @@ class MainViewModel @Inject constructor(
 
                 runCatching {
                     withContext(Dispatchers.IO) { ContainerUtils.getContainer(context, appId) }
-                }.getOrNull()?.let { FossilizeManager.uploadPendingAsync(context, it) }?.let { CloseSyncTracker.track(closeSyncKey, it) }
+                }.getOrNull()?.let { FossilizeManager.uploadPendingAsync(context, it, closeSyncKey) }
                 handleExitCloudSync(context, appId, gameId)
                 closeSync.complete()
 
@@ -802,10 +823,20 @@ class MainViewModel @Inject constructor(
                     return@launch
                 }
 
+                // the game screen already showed why steamhost gave up; no crash-help offer for it.
+                if (steamHostFailure != null) return@launch
+
                 // The Ubisoft stand-in reports a refused session or an error after the run.
-                if (ContainerUtils.extractGameSourceFromContainerId(appId) == GameSource.STEAM) {
+                val exitSource = ContainerUtils.extractGameSourceFromContainerId(appId)
+                if (exitSource == GameSource.STEAM || exitSource == GameSource.UBISOFT) {
                     val ubisoftOutcome = withContext(Dispatchers.IO) {
-                        runCatching { app.gamenative.service.ubisoft.UbisoftLaunchSupport.takeExitOutcome(context, appId, gameId) }
+                        runCatching {
+                            if (exitSource == GameSource.UBISOFT) {
+                                app.gamenative.service.ubisoft.UbisoftStore.takeExitOutcome(ContainerUtils.getContainer(context, appId))
+                            } else {
+                                app.gamenative.service.ubisoft.UbisoftLaunchSupport.takeExitOutcome(context, appId, gameId)
+                            }
+                        }
                             .onFailure { Timber.tag("Exit").w(it, "Ubisoft status not read for $appId") }
                             .getOrNull()
                     }
@@ -873,6 +904,9 @@ class MainViewModel @Inject constructor(
             sessionLengthMs in 1 until SHORT_SESSION_MS -> "short_session"
             else -> return false
         }
+        // html5 never maps an X window, so without this the "no_window" offer would fire after every
+        // html5 session.
+        if (withContext(Dispatchers.IO) { app.gamenative.html5.host.Html5Routing.isHtml5App(context, appId) }) return false
         return offerAiDebugRun(context, appId, trigger)
     }
 
@@ -896,6 +930,19 @@ class MainViewModel @Inject constructor(
 
     private suspend fun handleExitCloudSync(context: Context, appId: String, gameId: Int) {
         val gameSource = ContainerUtils.extractGameSourceFromContainerId(appId)
+        val storeGame = if (StoreGames.isStore(gameSource)) StoreGames.game(gameId) else null
+        if (storeGame != null) {
+            try {
+                withContext(Dispatchers.IO) {
+                    StoreGames.adapter(storeGame)?.afterExit(context, ContainerUtils.getContainer(context, appId), storeGame)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                Timber.tag("Exit").w(t, "Store exit handling failed for $appId")
+            }
+            return
+        }
         // isOffline is derived from Steam's login state (see PluviaMain's startDestination / onClickPlay)
         // and is meaningless for GOG/Epic, which check their own auth internally — only gate Steam on it.
         val isLocalSavesOnly = ContainerUtils.isLocalSavesOnly(context, appId)
@@ -904,6 +951,7 @@ class MainViewModel @Inject constructor(
             if (!isLocalSavesOnly && gameSource == GameSource.STEAM) {
                 pushEaCloudSaves(context, appId, gameId)
                 pushRockstarCloudSaves(context, appId, gameId)
+                pushUbisoftCloudSaves(context, appId, gameId)
             }
             return
         }
@@ -913,10 +961,13 @@ class MainViewModel @Inject constructor(
             withContext(Dispatchers.IO) {
                 try {
                     Timber.tag("GOG").d("[Cloud Saves] Starting post-game upload sync for $appId")
+                    // mirror-delete only for html5; wine stays accretive.
+                    val isHtml5 = app.gamenative.html5.host.Html5Routing.isHtml5App(context, appId)
                     val syncSuccess = app.gamenative.service.gog.GOGService.syncCloudSaves(
                         context = context,
                         appId = appId,
                         preferredAction = "upload",
+                        chromiumProfileSync = isHtml5,
                     )
                     if (syncSuccess) {
                         Timber.tag("GOG").i("[Cloud Saves] Upload sync completed successfully for $appId")
@@ -937,10 +988,13 @@ class MainViewModel @Inject constructor(
             withContext(Dispatchers.IO) {
                 try {
                     Timber.tag("Epic").d("[Cloud Saves] Starting post-game upload sync for $gameId")
+                    // mirror-delete + chromium-internal filter only for html5; wine stays unfiltered.
+                    val isHtml5 = app.gamenative.html5.host.Html5Routing.isHtml5App(context, appId)
                     val syncSuccess = EpicCloudSavesManager.syncCloudSaves(
                         context = context,
                         appId = gameId,
                         preferredAction = "upload",
+                        chromiumProfileSync = isHtml5,
                     )
                     if (syncSuccess) {
                         Timber.tag("Epic").i("[Cloud Saves] Upload sync completed successfully for $gameId")
@@ -961,7 +1015,10 @@ class MainViewModel @Inject constructor(
                 val container = withContext(Dispatchers.IO) {
                     ContainerUtils.getContainer(context, appId)
                 }
-                SteamService.closeApp(context, gameId, isOffline.value) { prefix ->
+                // leveldb churns files on compaction; propagate deletes so cloud doesn't keep stale
+                // .ldb/MANIFEST-* that break desktop. wine keeps the accretive default.
+                val isHtml5 = container.runtime == com.winlator.container.Container.RUNTIME_WEBVIEW
+                SteamService.closeApp(context, gameId, isOffline.value, chromiumProfileSync = isHtml5) { prefix ->
                     PathType.from(prefix).toAbsPath(container, gameId, SteamService.userSteamId!!.accountID)
                 }.await()
             } catch (e: CancellationException) {
@@ -971,6 +1028,7 @@ class MainViewModel @Inject constructor(
             }
             pushEaCloudSaves(context, appId, gameId)
             pushRockstarCloudSaves(context, appId, gameId)
+            pushUbisoftCloudSaves(context, appId, gameId)
         }
     }
 
@@ -999,6 +1057,20 @@ class MainViewModel @Inject constructor(
             throw e
         } catch (t: Throwable) {
             Timber.tag("RockstarCloud").w("Cloud save push failed for $gameId: ${t.javaClass.simpleName}")
+        }
+    }
+
+    private suspend fun pushUbisoftCloudSaves(context: Context, appId: String, gameId: Int) {
+        try {
+            withContext(Dispatchers.IO) {
+                if (!app.gamenative.service.ubisoft.UbisoftLaunchSupport.isUbisoftTitle(File(SteamService.getAppDirPath(gameId)))) return@withContext
+                val container = ContainerUtils.getContainer(context, appId)
+                app.gamenative.service.ubisoft.UbisoftCloudSavesManager.syncAfterExit(context, container, gameId)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            Timber.tag("UbisoftCloud").w("Cloud save push failed for $gameId: ${t.javaClass.simpleName}")
         }
     }
 
@@ -1078,28 +1150,54 @@ class MainViewModel @Inject constructor(
                         processes.add(process)
                     } while (parentWindow != null)
 
-                    val installedBranch = SteamService.getInstalledApp(gameId)?.branch ?: "public"
-                    GameProcessInfo(appId = gameId, branch = installedBranch, processes = processes).let {
-                        // Only notify Steam if we're not using real Steam
-                        // When launchRealSteam is true, let the real Steam client handle the "game is running" notification
-                        val shouldLaunchRealSteam = try {
-                            val container = ContainerUtils.getContainer(context, appId)
-                            container.isLaunchRealSteam() || container.isLaunchBionicSteam()
-                        } catch (e: Exception) {
-                            // Container might not exist, default to notifying Steam
-                            false
-                        }
-
-                        if (!shouldLaunchRealSteam) {
-                            ActiveGameRegistry.set(it)
-                            SteamService.notifyRunningProcesses(it)
-                        } else {
-                            ActiveGameRegistry.clear()
-                            Timber.tag("MainViewModel").i("Skipping Steam process notification - real Steam will handle this")
-                        }
-                    }
+                    announceSteamGame(context, appId, gameId, processes)
                 }
             }
+        }
+    }
+
+    /**
+     * The gamescope counterpart of [onWindowMapped]'s Steam report: no game window maps on this X
+     * server, so the game's process comes from the Wine process list once gamescope shows content.
+     */
+    private fun announceGamescopeGameToSteam() {
+        viewModelScope.launch {
+            val appId = _state.value.launchedAppId
+            if (appId.isEmpty() || ContainerUtils.extractGameSourceFromContainerId(appId) != GameSource.STEAM) {
+                return@launch
+            }
+            val gameId = ContainerUtils.extractGameIdFromContainerId(appId)
+            if (SteamService.getAppInfoOf(gameId) == null || ActiveGameRegistry.get()?.appId == gameId) {
+                return@launch
+            }
+            val steamProcessId = Process.myPid()
+            val processes = withContext(Dispatchers.IO) { WineProcessSnapshotHelper.readFromProc() }
+                .filterNot { WineProcessSnapshotHelper.isSystemProcessName(it.name) }
+                .take(1)
+                .map { AppProcessInfo(it.pid, steamProcessId, true) }
+            announceSteamGame(appContext, appId, gameId, processes)
+        }
+    }
+
+    private suspend fun announceSteamGame(context: Context, appId: String, gameId: Int, processes: List<AppProcessInfo>) {
+        val installedBranch = SteamService.getInstalledApp(gameId)?.branch ?: "public"
+        val game = GameProcessInfo(appId = gameId, branch = installedBranch, processes = processes)
+        // Only notify Steam if we're not using real Steam
+        // When launchRealSteam is true, let the real Steam client handle the "game is running" notification
+        val shouldLaunchRealSteam = try {
+            val container = ContainerUtils.getContainer(context, appId)
+            container.isLaunchRealSteam() || container.isLaunchBionicSteam()
+        } catch (e: Exception) {
+            // Container might not exist, default to notifying Steam
+            false
+        }
+
+        if (!shouldLaunchRealSteam) {
+            ActiveGameRegistry.set(game)
+            SteamService.notifyRunningProcesses(game)
+        } else {
+            ActiveGameRegistry.clear()
+            Timber.tag("MainViewModel").i("Skipping Steam process notification - real Steam will handle this")
         }
     }
 

@@ -76,6 +76,25 @@ class OptimizeRulesTest {
         assertFalse(OptimizeTarget.met(OptimizeProfile.PERFORMANCE, good.copy(steadyFps = null), 60.0, 0))
     }
 
+    @Test
+    fun potatoIsDoneWhenPerformanceIsDone() {
+        val good = Metrics(gameplaySec = 900, steadyFps = 59.0, cls = "none", confident = true, fpsBy5Min = listOf(40, 59, 58, 60))
+        // 35 fps on a 60 Hz screen with no limiter is short of the target, and the ladder stays open.
+        val short = good.copy(gameplaySec = 328, steadyFps = 35.4, fpsBy5Min = listOf(29, 44))
+        val at30 = good.copy(steadyFps = 30.0, fpsBy5Min = listOf(20, 30, 29, 30))
+        assertFalse(OptimizeTarget.met(OptimizeProfile.POTATO, short, 60.0, 0))
+        assertFalse(OptimizeTarget.met(OptimizeProfile.POTATO, at30, 60.0, 0))
+        assertTrue(OptimizeTarget.met(OptimizeProfile.POTATO, at30, 60.0, 30))
+        for (m in listOf(good, short, at30, good.copy(cls = "thermal_gpu"))) {
+            for (cap in listOf(0, 30)) {
+                assertEquals(OptimizeTarget.met(OptimizeProfile.PERFORMANCE, m, 60.0, cap), OptimizeTarget.met(OptimizeProfile.POTATO, m, 60.0, cap))
+            }
+        }
+        val settled = OptimizeTarget.settle(OptimizeProfile.POTATO, OptimizeJudge.HELPED, OptimizeJudge.REASON_FPS, short, 60.0, 0)
+        assertFalse(settled.done)
+        assertEquals(OptimizeJudge.HELPED, settled.result)
+    }
+
     /** The Odin 3 The Forest baseline: 56.7 fps at a 60 cap, windows 54-58, thermal status 5 throughout. */
     private val forest = Metrics(
         gameplaySec = 1056, steadyFps = 56.7, stutterShare = 0.0008, throttleOnsetSec = 0,
@@ -671,7 +690,6 @@ class OptimizeRulesTest {
                 OptimizeProfile.BALANCED to ProfileLadder(
                     state = LadderState.TRYING,
                     tried = listOf(TriedRung("b1", "1", OptimizeJudge.NO_CHANGE), crashed, TriedRung("b2", "2", OptimizeJudge.UNDO)),
-                    bad = listOf("c1"),
                     noChangeStreak = 2,
                     baselineOverride = session.copy(steadyFps = 50.0),
                 ),
@@ -688,7 +706,6 @@ class OptimizeRulesTest {
         val balanced = next.ladder(OptimizeProfile.BALANCED)
         assertEquals(LadderState.PAUSED, balanced.state)
         assertEquals(listOf(crashed), balanced.tried)
-        assertEquals(listOf("c1"), balanced.bad)
         assertEquals(0, balanced.noChangeStreak)
         assertEquals(session, balanced.baselineOverride)
         assertTrue(balanced.kept.isEmpty())

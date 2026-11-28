@@ -259,7 +259,8 @@ object BestConfigService {
      * when the matched GPU is from a different family than the user's actual GPU.
      *
      * - Adreno 6xx requires DXVK 1.11.1-sarek (newer DXVK 2.x is incompatible).
-     * - Adreno 8 Elite Gen 5 (84x/85x) requires the MrPurple T26 driver.
+     * - Adreno 85x (8 Elite Gen 6) requires the Rutabaga Turnip driver.
+     * - Adreno 84x (8 Elite Gen 5) requires the MrPurple T26 driver.
      * - Adreno A12 requires the A12-fix Turnip driver.
      *
      * The override is skipped when the matched GPU is the same family (e.g. an
@@ -280,13 +281,21 @@ object BestConfigService {
             filteredJson.put("dxwrapperConfig", kvs.toString())
         }
 
+        if (GPUInformation.isAdreno85x(context) && !matched.matches(Regex(".*adreno.*\\b85[0-9]\\b.*"))) {
+            val kvs = KeyValueSet(filteredJson.optString("graphicsDriverConfig", ""))
+            kvs.put("version", ContainerUtils.WRAPPER_ADRENO_85X)
+            filteredJson.put("graphicsDriverConfig", kvs.toString())
+            filteredJson.put("graphicsDriverVersion", ContainerUtils.WRAPPER_ADRENO_85X)
+        }
+
         if (GPUInformation.isAdreno8EliteGen5(context) &&
-            !matched.matches(Regex(".*adreno.*\\b8(4[0-9]|5[0-9])\\b.*"))
+            !GPUInformation.isAdreno85x(context) &&
+            !matched.matches(Regex(".*adreno.*\\b84[0-9]\\b.*"))
         ) {
             val kvs = KeyValueSet(filteredJson.optString("graphicsDriverConfig", ""))
-            kvs.put("version", "Turnip Adreno Driver T26 (@Mr_Purple_666)")
+            kvs.put("version", ContainerUtils.WRAPPER_ADRENO_8ELITE_GEN5)
             filteredJson.put("graphicsDriverConfig", kvs.toString())
-            filteredJson.put("graphicsDriverVersion", "Turnip Adreno Driver T26 (@Mr_Purple_666)")
+            filteredJson.put("graphicsDriverVersion", ContainerUtils.WRAPPER_ADRENO_8ELITE_GEN5)
         }
 
         if (GPUInformation.isAdreno8Elite(context) &&
@@ -891,6 +900,8 @@ object BestConfigService {
                 }
 
                 val containerVariant = originalJson.optString("containerVariant", "")
+                // html5 containers may legitimately lack wineVersion / dxwrapper, so skip the wine gates.
+                val isHtml5 = containerVariant.equals(Container.CONTAINER_VARIANT_HTML5, ignoreCase = true)
 
                 // glibc is not supported on the modern flavor — reject the entire config so neither
                 // server best-config responses nor JSON imports can switch a container to glibc.
@@ -899,7 +910,7 @@ object BestConfigService {
                     return ParsedConfigResult(emptyMap())
                 }
 
-                if (!originalJson.has("wineVersion") || originalJson.isNull("wineVersion")) {
+                if (!isHtml5 && (!originalJson.has("wineVersion") || originalJson.isNull("wineVersion"))) {
                     if (containerVariant.equals(Container.GLIBC, ignoreCase = true)) {
                         originalJson.put("wineVersion", "wine-9.2-x86_64")
                     }
@@ -908,11 +919,11 @@ object BestConfigService {
                         return ParsedConfigResult(emptyMap())
                     }
                 }
-                if (!originalJson.has("dxwrapper") || originalJson.isNull("dxwrapper")) {
+                if (!isHtml5 && (!originalJson.has("dxwrapper") || originalJson.isNull("dxwrapper"))) {
                     Timber.tag("BestConfigService").w("dxwrapper is missing or null in original config, returning empty map")
                     return ParsedConfigResult(emptyMap())
                 }
-                if (!originalJson.has("dxwrapperConfig") || originalJson.isNull("dxwrapperConfig")) {
+                if (!isHtml5 && (!originalJson.has("dxwrapperConfig") || originalJson.isNull("dxwrapperConfig"))) {
                     Timber.tag("BestConfigService").w("dxwrapperConfig is missing or null in original config, returning empty map")
                     return ParsedConfigResult(emptyMap())
                 }
@@ -926,15 +937,15 @@ object BestConfigService {
                     Timber.tag("BestConfigService").w("containerVariant is empty in original config, returning empty map")
                     return ParsedConfigResult(emptyMap())
                 }
-                if (wineVersion.isEmpty()) {
+                if (!isHtml5 && wineVersion.isEmpty()) {
                     Timber.tag("BestConfigService").w("wineVersion is empty in original config, returning empty map")
                     return ParsedConfigResult(emptyMap())
                 }
-                if (dxwrapper.isEmpty()) {
+                if (!isHtml5 && dxwrapper.isEmpty()) {
                     Timber.tag("BestConfigService").w("dxwrapper is empty in original config, returning empty map")
                     return ParsedConfigResult(emptyMap())
                 }
-                if (dxwrapperConfig.isEmpty()) {
+                if (!isHtml5 && dxwrapperConfig.isEmpty()) {
                     Timber.tag("BestConfigService").w("dxwrapperConfig is empty in original config, returning empty map")
                     return ParsedConfigResult(emptyMap())
                 }

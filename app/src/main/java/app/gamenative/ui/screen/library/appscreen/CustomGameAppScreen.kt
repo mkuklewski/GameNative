@@ -2,7 +2,7 @@ package app.gamenative.ui.screen.library.appscreen
 
 import android.content.Context
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import app.gamenative.ui.component.RingTextButton
 import app.gamenative.ui.component.dialog.LoadingDialog
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
@@ -173,6 +173,7 @@ class CustomGameAppScreen : BaseAppScreen() {
             logoUrl = logoUrl,
             capsuleUrl = capsuleUrl,
             headerUrl = headerUrl,
+            runtime = app.gamenative.html5.host.Html5Routing.rememberRuntime(context, libraryItem.appId, libraryItem.gameId),
         )
     }
 
@@ -350,32 +351,6 @@ class CustomGameAppScreen : BaseAppScreen() {
         }
     }
 
-    /**
-     * Override Reset Container to show confirmation dialog and preserve drives
-     */
-    @Composable
-    override fun getResetContainerOption(
-        context: Context,
-        libraryItem: LibraryItem
-    ): AppMenuOption {
-        var showResetConfirmDialog by remember { mutableStateOf(false) }
-
-        if (showResetConfirmDialog) {
-            ResetConfirmDialog(
-                onConfirm = {
-                    showResetConfirmDialog = false
-                    resetContainerToDefaults(context, libraryItem)
-                },
-                onDismiss = { showResetConfirmDialog = false }
-            )
-        }
-
-        return AppMenuOption(
-            optionType = AppOptionMenuType.ResetToDefaults,
-            onClick = { showResetConfirmDialog = true }
-        )
-    }
-
    /**
      * Custom Game-specific menu options
      */
@@ -464,7 +439,8 @@ class CustomGameAppScreen : BaseAppScreen() {
         libraryItem: LibraryItem,
         onDismiss: () -> Unit,
         onEditContainer: () -> Unit,
-        onBack: () -> Unit
+        onBack: () -> Unit,
+        onClickPlay: (Boolean) -> Unit,
     ) {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
@@ -499,7 +475,7 @@ class CustomGameAppScreen : BaseAppScreen() {
                     Text(text = stringResource(R.string.custom_game_delete_message, libraryItem.name))
                 },
                 confirmButton = {
-                    TextButton(
+                    RingTextButton(
                         onClick = {
                             hideDeleteDialog(libraryItem.appId)
                             showDeletingDialog = true
@@ -554,7 +530,7 @@ class CustomGameAppScreen : BaseAppScreen() {
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = {
+                    RingTextButton(onClick = {
                         hideDeleteDialog(libraryItem.appId)
                     }) {
                         Text("Cancel")

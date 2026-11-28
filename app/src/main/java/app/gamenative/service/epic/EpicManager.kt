@@ -769,6 +769,7 @@ class EpicManager @Inject constructor(
 
     suspend fun uninstall(appId: Int) {
         withContext(Dispatchers.IO) {
+            epicGameDao.uninstallDlcForTitle(appId)
             epicGameDao.uninstall(appId)
         }
     }
@@ -778,6 +779,8 @@ class EpicManager @Inject constructor(
             epicGameDao.getNonInstalledGames()
         }
     }
+
+    suspend fun getInstalledGames(): List<EpicGame> = withContext(Dispatchers.IO) { epicGameDao.getInstalledGames() }
 
     /**
      * Start background sync (called after login)
@@ -1156,6 +1159,7 @@ class EpicManager @Inject constructor(
                 prereqIds = meta?.prereqIds.orEmpty(),
                 prereqName = meta?.prereqName.orEmpty(),
                 prereqPath = meta?.prereqPath.orEmpty(),
+                dlcVersions = EpicInstallState.read(installPath)?.dlcVersions.orEmpty(),
             )
             EpicInstallState.write(installPath, state)
             Timber.tag("Epic").i("Backfilled install state for ${game.appName}: matchesLatest=$matches version=${state.buildVersion}")
@@ -1198,7 +1202,13 @@ class EpicManager @Inject constructor(
             val manifest = app.gamenative.service.epic.manifest.EpicManifest.readAll(manifestData.manifestBytes)
 
             // Required-only sizes for detail page display (download uses container language via getSizesForSelectedInstallTags elsewhere).
-            val (downloadSize, installSize) = app.gamenative.service.epic.manifest.ManifestUtils.getSizesForSelectedInstallTags(manifest, emptyList())
+            // DLC downloads write every file in their manifest, so their sizes cover the whole manifest.
+            val (downloadSize, installSize) = if (game.isDLC) {
+                app.gamenative.service.epic.manifest.ManifestUtils.getTotalDownloadSize(manifest) to
+                    app.gamenative.service.epic.manifest.ManifestUtils.getTotalInstalledSize(manifest)
+            } else {
+                app.gamenative.service.epic.manifest.ManifestUtils.getSizesForSelectedInstallTags(manifest, emptyList())
+            }
             Timber.tag("Epic").d(
                 "Manifest stats for $appName: version=${manifest.version}, featureLevel=${manifest.meta?.featureLevel}, " +
                     "buildVersion=${manifest.meta?.buildVersion}, buildId=${manifest.meta?.buildId}",

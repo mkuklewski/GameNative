@@ -1,6 +1,12 @@
 package app.gamenative.ui.screen.login
 
 import android.content.Context
+import app.gamenative.ui.component.RingButton
+import app.gamenative.ui.component.RingIconButton
+import app.gamenative.ui.component.RingTextButton
+import app.gamenative.ui.component.ThemedOutlinedButton
+import app.gamenative.ui.component.focusOnNavigationKey
+import app.gamenative.ui.component.focusOnOpen
 import app.gamenative.ui.util.SnackbarManager
 import android.view.KeyEvent
 import android.content.Intent
@@ -39,7 +45,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -47,16 +52,13 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import app.gamenative.ui.component.NoExtractOutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -96,6 +98,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import app.gamenative.Constants
+import app.gamenative.data.GameSource
+import app.gamenative.service.store.StoreAdapters
+import app.gamenative.service.store.StoreGames
 import app.gamenative.ui.screen.auth.AmazonOAuthActivity
 import app.gamenative.ui.screen.auth.EpicOAuthActivity
 import app.gamenative.ui.screen.auth.GOGOAuthActivity
@@ -304,6 +309,7 @@ fun UserLoginScreen(
         onLaunchGog = { gogOAuthLauncher.launch(Intent(context, GOGOAuthActivity::class.java)) },
         onLaunchEpic = { epicOAuthLauncher.launch(Intent(context, EpicOAuthActivity::class.java)) },
         onLaunchAmazon = { amazonOAuthLauncher.launch(Intent(context, AmazonOAuthActivity::class.java)) },
+        onLaunchStore = { store -> StoreGames.startSignIn(context, store, onPlatformSignedIn) },
     )
 }
 
@@ -327,16 +333,19 @@ private fun UserLoginScreenContent(
     onLaunchGog: () -> Unit,
     onLaunchEpic: () -> Unit,
     onLaunchAmazon: () -> Unit,
+    onLaunchStore: (GameSource) -> Unit = {},
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
     val tertiaryColor = MaterialTheme.colorScheme.tertiary
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val defaultFocus = remember { FocusRequester() }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .focusOnNavigationKey(defaultFocus)
             .background(MaterialTheme.colorScheme.background)
             .imePadding(),
     ) {
@@ -367,7 +376,7 @@ private fun UserLoginScreenContent(
 
                 // Privacy Policy Button
                 val uriHandler = LocalUriHandler.current
-                TextButton(
+                RingTextButton(
                     onClick = { uriHandler.openUri(Constants.Misc.PRIVACY_LINK) },
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
                     shape = RoundedCornerShape(8.dp),
@@ -549,28 +558,45 @@ private fun UserLoginScreenContent(
                     FlowRow(
                         horizontalArrangement = Arrangement.Center,
                     ) {
-                        TextButton(onClick = onLaunchEpic) {
+                        RingTextButton(
+                            onClick = onLaunchEpic,
+                            // never the username field, which would open the keyboard; 2fa focuses its code field
+                            modifier = if (userLoginState.loginScreen != LoginScreen.TWO_FACTOR) {
+                                Modifier.focusOnOpen().focusRequester(defaultFocus)
+                            } else {
+                                Modifier
+                            },
+                        ) {
                             Text(
                                 text = "Epic",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }
-                        TextButton(onClick = onLaunchGog) {
+                        RingTextButton(onClick = onLaunchGog) {
                             Text(
                                 text = "GOG",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }
-                        TextButton(onClick = onLaunchAmazon) {
+                        RingTextButton(onClick = onLaunchAmazon) {
                             Text(
                                 text = "Amazon",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }
-                        TextButton(onClick = onContinueOffline) {
+                        for (store in StoreAdapters.all) {
+                            RingTextButton(onClick = { onLaunchStore(store.source) }) {
+                                Text(
+                                    text = store.displayName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                        RingTextButton(onClick = onContinueOffline) {
                             Text(
                                 text = stringResource(R.string.login_skip_login),
                                 style = MaterialTheme.typography.bodyMedium,
@@ -676,7 +702,7 @@ private fun CredentialsForm(
                     ) {
                         Text(stringResource(R.string.no_connection_to_steam), color = Color.White)
                         Box(contentAlignment = Alignment.Center) {
-                            OutlinedButton(
+                            ThemedOutlinedButton(
                                 onClick = onRetryConnection,
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     containerColor = Color.Transparent,
@@ -689,7 +715,7 @@ private fun CredentialsForm(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Box(contentAlignment = Alignment.Center) {
-                            Button(onClick = { onContinueOffline() }) {
+                            RingButton(onClick = { onContinueOffline() }) {
                                 Text(stringResource(R.string.continue_offline))
                             }
                         }
@@ -788,7 +814,7 @@ private fun CredentialsForm(
                     stringResource(R.string.login_password_show)
                 }
 
-                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                RingIconButton(onClick = { passwordVisible = !passwordVisible }) {
                     Icon(
                         imageVector = image,
                         contentDescription = description,
@@ -798,7 +824,7 @@ private fun CredentialsForm(
             },
         )
 
-        Button(
+        RingButton(
             onClick = {
                 keyboardController?.hide()
                 onLoginBtnClick()
@@ -862,7 +888,7 @@ private fun QRCodeLogin(
                     modifier = Modifier.padding(bottom = 16.dp),
                 )
 
-                OutlinedButton(
+                ThemedOutlinedButton(
                     onClick = onQrRetry,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary),
                     modifier = Modifier.padding(top = 16.dp),

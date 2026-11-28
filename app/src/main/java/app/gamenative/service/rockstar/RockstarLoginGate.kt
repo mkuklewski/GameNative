@@ -13,7 +13,7 @@ import timber.log.Timber
  * opens the sign-in activity and suspends the launch until a token comes back, or the user
  * dismisses it.
  *
- * The Steam service is held alive while the window is open: once the sign-in window is in
+ * For a Steam copy the Steam service is held alive while the window is open: once the sign-in window is in
  * front, MainActivity stops it as idle, and the activity mints the ticket for the account link
  * after the login.
  */
@@ -23,23 +23,23 @@ object RockstarLoginGate {
     /** Set by the sign-in activity when the page's title validation answered 200. */
     @Volatile var titleValidated = false
 
-    suspend fun ensureSignedIn(context: Context, activeTitle: String, steamAppId: Int = 0, activateTitle: Boolean = false): Result<Unit> {
+    suspend fun ensureSignedIn(context: Context, activeTitle: String, store: RockstarStore? = null, activateTitle: Boolean = false): Result<Unit> {
         require(activeTitle.matches(Regex("[a-z0-9_]{1,127}")))
         if (RockstarAuthManager.isLoggedIn(context) && !activateTitle && !storedSessionRejected(context)) return Result.success(Unit)
         val deferred = CompletableDeferred<String?>()
         pending = deferred
         titleValidated = false
         val keepAliveBefore = SteamService.keepAlive
-        SteamService.keepAlive = true
+        if (store is RockstarStore.Steam) SteamService.keepAlive = true
         val intent = Intent(context, RockstarOAuthActivity::class.java)
             .putExtra(RockstarConstants.ACTIVE_TITLE_EXTRA, activeTitle)
-            .putExtra(RockstarConstants.STEAM_APP_ID_EXTRA, steamAppId)
             .putExtra(RockstarConstants.ACTIVATE_TITLE_EXTRA, activateTitle)
+            .let { store?.putInto(it) ?: it }
         if (context !is Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
         val token = try { deferred.await() } finally {
             if (pending === deferred) pending = null
-            SteamService.keepAlive = keepAliveBefore
+            if (store is RockstarStore.Steam) SteamService.keepAlive = keepAliveBefore
         }
         if (token.isNullOrEmpty()) return Result.failure(IllegalStateException("Rockstar sign-in cancelled"))
         RockstarAuthManager.store(context, token)
@@ -49,12 +49,13 @@ object RockstarLoginGate {
 
     /**
      * ScAuthTokens expire, and the game's own error for an expired one says to reinstall. Only an
-     * explicit rejection drops the session: a network failure must not block an offline launch.
+     * explicit rejection drops the session: a network failure or a timeout must not block an
+     * offline launch.
      */
     private suspend fun storedSessionRejected(context: Context): Boolean {
         val token = RockstarAuthManager.load(context)?.scAuthToken ?: return false
         val rejected = try {
-            RockstarCloudApi.createLauncherTicket(token)
+            RockstarCloudApi.createLauncherTicket(token, quick = true)
             false
         } catch (e: RockstarCloudException) {
             e.code?.startsWith("AuthenticationFailed", ignoreCase = true) == true

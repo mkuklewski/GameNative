@@ -292,6 +292,9 @@ class SteamService : Service(), IChallengeUrlChanged {
     private var _steamParental: Parental? = null
     private var _steamPlayer: Player? = null
 
+    // for GreenworksCloudClient, so greenworks shares SteamAutoCloud's handler without loosening _steamCloud.
+    internal fun steamCloudHandler(): SteamCloud? = _steamCloud
+
     private var _loginResult: LoginResult = LoginResult.Failed
 
     private var licenses: List<License> = emptyList()
@@ -515,6 +518,14 @@ class SteamService : Service(), IChallengeUrlChanged {
                 depotKeyPrep.remove(appId)
                 prep.owner.updateStatusMessage(null)
             }
+        }
+
+        // first .exe launch entry for [os]; null when no match or it has no arguments.
+        fun getLaunchArgumentsForOs(appId: Int, os: OS = OS.windows): String? {
+            val launches = getAppInfoOf(appId)?.config?.launch ?: return null
+            val idx = launches.indexOfFirst { os in it.configOS && it.executable.endsWith(".exe", ignoreCase = true) }
+            if (idx < 0) return null
+            return launches[idx].arguments.takeIf { it.isNotEmpty() }
         }
 
         internal fun notifyDownloadStarted(appId: Int) {
@@ -1684,6 +1695,19 @@ class SteamService : Service(), IChallengeUrlChanged {
         }
 
         /**
+         * Whether the parent app's own depot entry gives this depot, with content, to a DLC other
+         * than [dlcAppId]. A DLC app's record can list a depot that belongs to a sibling DLC, at a
+         * manifest the parent no longer uses (XCOM: Enemy Unknown: app 209811 lists depot 209812,
+         * which the parent assigns to DLC 209812). The parent's entry is the one the update check
+         * reads, so it has to win or the depot installs at a gid that never matches.
+         */
+        fun parentAssignsDepotToOtherDlc(parentDepot: DepotInfo?, dlcAppId: Int): Boolean {
+            if (parentDepot == null) return false
+            if (parentDepot.dlcAppId == INVALID_APP_ID || parentDepot.dlcAppId == dlcAppId) return false
+            return parentDepot.manifests.isNotEmpty() || parentDepot.encryptedManifests.isNotEmpty()
+        }
+
+        /**
          * Depots eligible for preference-flag computation: delegates to
          * [filterForDownloadableDepots] with both preference flags false
          * so arch and Steam Deck checks become no-ops. This gives us the pool from
@@ -1816,6 +1840,9 @@ class SteamService : Service(), IChallengeUrlChanged {
                         )
                     }
                     .forEach { (depotId, depot) ->
+                        // Checked against the parent's full depot list, not `map`: the owning DLC may be
+                        // unowned or unselected, and the depot still isn't this DLC's to install.
+                        if (parentAssignsDepotToOtherDlc(appInfo.depots[depotId], dlcApp.id)) return@forEach
                         // Add DLC Depots with custom object
                         map[depotId] = DepotInfo(
                             depotId = depot.depotId,
@@ -1837,13 +1864,31 @@ class SteamService : Service(), IChallengeUrlChanged {
             return map
         }
 
+        /**
+         * True when [name] is a folder below an install root. Steam app info can carry an
+         * installdir such as "." (app 3082170), which would resolve to the install root itself.
+         */
+        fun isSafeAppDirName(name: String): Boolean {
+            val segments = name.split('/', '\\').filter { it.isNotBlank() }
+            return segments.isNotEmpty() && segments.none { it.trim() == "." || it.trim() == ".." }
+        }
+
         fun getAppDirName(app: SteamApp?): String {
             // The folder name, if it got made
-            var appName = app?.config?.installDir.orEmpty()
-            if (appName.isEmpty()) {
-                appName = app?.name.orEmpty()
+            val installDir = app?.config?.installDir.orEmpty()
+            if (isSafeAppDirName(installDir)) return installDir
+            val name = app?.name.orEmpty()
+            if (isSafeAppDirName(name)) return name
+            return app?.id?.toString().orEmpty()
+        }
+
+        /** True when [dir] is one of [installRoots] or a parent of one: never a single game's folder. */
+        fun isInstallRootOrAbove(dir: File, installRoots: List<String> = allInstallPaths): Boolean {
+            val target = runCatching { dir.canonicalFile }.getOrElse { dir.absoluteFile }.toPath()
+            return installRoots.any { root ->
+                val rootPath = runCatching { File(root).canonicalFile }.getOrElse { File(root).absoluteFile }.toPath()
+                rootPath.startsWith(target)
             }
-            return appName
         }
 
         /**
@@ -1854,7 +1899,7 @@ class SteamService : Service(), IChallengeUrlChanged {
             var firstExisting: String? = null
             for (basePath in installPaths) {
                 for (name in names) {
-                    if (name.isEmpty()) continue
+                    if (!isSafeAppDirName(name)) continue
                     val path = Paths.get(basePath, name)
                     if (Files.isDirectory(path)) {
                         if (MarkerUtils.hasMarker(path.pathString, Marker.DOWNLOAD_COMPLETE_MARKER)) {
@@ -2007,7 +2052,7 @@ class SteamService : Service(), IChallengeUrlChanged {
         fun getInstalledExe(appId: Int): String {
             val appInfo = getAppInfoOf(appId) ?: return ""
 
-            val installDir = appInfo.config.installDir.ifEmpty { appInfo.name }
+            val installDir = getAppDirName(appInfo)
 
             val depots = appInfo.depots.values.filter { d ->
                 !d.sharedInstall && d.isWindowsCompatible
@@ -2154,11 +2199,17 @@ class SteamService : Service(), IChallengeUrlChanged {
                 val appDirPath = getAppDirPath(appId)
                 val appDir = File(appDirPath)
 
-                if (appDir.exists()) {
-                    MarkerUtils.removeMarker(appDirPath, Marker.DOWNLOAD_COMPLETE_MARKER)
-                }
+                if (isInstallRootOrAbove(appDir)) {
+                    // no app info, or a folder name that points at the root: other games live here
+                    Timber.e("Refusing to delete $appDirPath for app $appId: it is an install root")
+                    false
+                } else {
+                    if (appDir.exists()) {
+                        MarkerUtils.removeMarker(appDirPath, Marker.DOWNLOAD_COMPLETE_MARKER)
+                    }
 
-                NativeTreeDelete.deleteTreeFast(File(appDirPath))
+                    NativeTreeDelete.deleteTreeFast(appDir)
+                }
             }
 
             // Remove from DB
@@ -2184,6 +2235,31 @@ class SteamService : Service(), IChallengeUrlChanged {
             }
 
             return@withContext result
+        }
+
+        /**
+         * Stops an update, verify or DLC download of an installed game and keeps the game: the
+         * complete marker stays, and the download record goes so the run is not offered as a resume.
+         */
+        suspend fun cancelDownloadKeepingGame(appId: Int) = withContext(Dispatchers.IO) {
+            val downloadInfo = getAppDownloadInfo(appId)
+            downloadInfo?.cancel()
+            downloadInfo?.awaitCompletion()
+            removeDownloadJob(appId)
+            workshopPausedApps.remove(appId)
+            instance?.appDao?.setWorkshopDownloadPending(appId, false)
+            instance?.applicationContext?.let { context ->
+                GameDownloadService.removeDownload(context, GameSource.STEAM, appId.toString())
+            }
+            instance?.downloadingAppInfoDao?.deleteApp(appId)
+            PrefManager.clearSteamDownloadMode(appId)
+            // The interrupted run may have put original Steam DLLs back, so the next launch
+            // must patch again, as it does after a finished run.
+            val appDirPath = getAppDirPath(appId)
+            MarkerUtils.removeMarker(appDirPath, Marker.STEAM_DLL_REPLACED)
+            MarkerUtils.removeMarker(appDirPath, Marker.STEAM_COLDCLIENT_USED)
+            MarkerUtils.removeMarker(appDirPath, Marker.STEAM_CEG_WRAPPED)
+            downloadInfo?.clearPersistedBytesDownloaded(appDirPath)
         }
 
         /**
@@ -3320,6 +3396,8 @@ class SteamService : Service(), IChallengeUrlChanged {
             prefixToPath: (String) -> String,
             isOffline: Boolean = false,
             onProgress: ((message: String, progress: Float) -> Unit)? = null,
+            // html5 leveldb-backed titles opt in; see SteamAutoCloud.syncUserFiles.
+            chromiumProfileSync: Boolean = false,
         ): Deferred<PostSyncInfo> = parentScope.asyncIsolated {
             if (isOffline || !isConnected) {
                 return@asyncIsolated PostSyncInfo(SyncResult.UpToDate)
@@ -3352,6 +3430,7 @@ class SteamService : Service(), IChallengeUrlChanged {
                                             parentScope = parentScope,
                                             prefixToPath = prefixToPath,
                                             onProgress = onProgress,
+                                            chromiumProfileSync = chromiumProfileSync,
                                         ).await()
 
                                         postSyncInfo?.let { info ->
@@ -3471,7 +3550,7 @@ class SteamService : Service(), IChallengeUrlChanged {
             }
         }
 
-        suspend fun closeApp(context: Context, appId: Int, isOffline: Boolean, prefixToPath: (String) -> String) = withContext(Dispatchers.IO) {
+        suspend fun closeApp(context: Context, appId: Int, isOffline: Boolean, chromiumProfileSync: Boolean = false, prefixToPath: (String) -> String) = withContext(Dispatchers.IO) {
             async {
                 if (isOffline || !isConnected) {
                     instance?.addPendingSyncApp(appId)
@@ -3504,6 +3583,7 @@ class SteamService : Service(), IChallengeUrlChanged {
                                                 steamCloud = steamCloud,
                                                 parentScope = this,
                                                 prefixToPath = prefixToPath,
+                                                chromiumProfileSync = chromiumProfileSync,
                                             ).await()
 
                                             steamCloud.signalAppExitSyncDone(
@@ -4068,7 +4148,19 @@ class SteamService : Service(), IChallengeUrlChanged {
             }
         }
 
-        suspend fun generateAchievements(appId: Int, configDirectory: String) {
+        // null when offline or the request fails.
+        suspend fun fetchUserStatsForApp(appId: Int): UserStatsCallback? {
+            val service = instance ?: return null
+            val steamUser = service._steamUser ?: return null
+            val steamId = steamUser.steamID ?: return null
+            val handler = service._steamUserStats ?: return null
+            return runCatching { handler.getUserStats(appId, steamId).await() }
+                .onFailure { Timber.tag("SteamService").w(it, "fetchUserStatsForApp failed for appId=$appId") }
+                .getOrNull()
+        }
+
+        // seedDirs: where the earned state is seeded; null = every GSE save dir (wine).
+        suspend fun generateAchievements(appId: Int, configDirectory: String, seedDirs: List<File>? = null) {
             val steamUser = instance!!._steamUser!!
             val userStats = instance?._steamUserStats!!.getUserStats(appId, steamUser.steamID!!).await()
             val schemaArray = userStats.schema.toByteArray()
@@ -4091,7 +4183,7 @@ class SteamService : Service(), IChallengeUrlChanged {
 
             // Seed the GSE Saves file with the real earned state from Steam to avoid re-trigger notifications
             val context = instance!!.applicationContext
-            val gseDirs = getGseSaveDirs(context, appId)
+            val gseDirs = seedDirs ?: getGseSaveDirs(context, appId)
             seedGseSaveAchievements(gseDirs, result.achievements, achievementResetTimes(userStats, nameToBlockBit))
         }
 
@@ -4233,7 +4325,7 @@ class SteamService : Service(), IChallengeUrlChanged {
         }
 
         suspend fun syncAchievementsFromGoldberg(context: Context, appId: Int) {
-            val gseSaveDirs = getGseSaveDirs(context, appId).filter { it.isDirectory }
+            val gseSaveDirs = achievementSaveDirs(context, appId).filter { it.isDirectory }
             if (gseSaveDirs.isEmpty()) {
                 Timber.d("No GSE save directory found for appId=$appId")
                 return
@@ -4278,7 +4370,33 @@ class SteamService : Service(), IChallengeUrlChanged {
                 return coldclientSettings.absolutePath
             }
 
+            // html5 containers have neither; Html5AchievementSeed generates the mapping here instead.
+            // without this the close-time sync can't find it and never pushes html5 unlocks.
+            if (container.runtime == Container.RUNTIME_WEBVIEW) {
+                html5SaveDirs(context, appId).map { gseSteamSettingsDir(it) }
+                    .firstOrNull { File(it, "achievement_name_to_block.json").exists() }
+                    ?.let { return it.absolutePath }
+            }
+
             return null
+        }
+
+        // steam_settings for titles with no game-side one (html5). NOT the GSE saves dir itself:
+        // generateAchievements writes its schema as achievements.json, which would overwrite the
+        // earned-state achievements.json GSE keeps there.
+        fun gseSteamSettingsDir(gseDir: File): File = File(gseDir, "steam_settings")
+
+        // html5 save dirs, home first. the userdata dir is home because every launch's
+        // migrateGSESavesToSteamUserdata moves the GSE Saves dir into it.
+        fun html5SaveDirs(context: Context, appId: Int): List<File> = getGseSaveDirs(context, appId).asReversed()
+
+        // the order the close-time sync reads stats in (first dir with stats wins): home first for html5, as its
+        // seed and bridge use; wine keeps GSE Saves first.
+        private fun achievementSaveDirs(context: Context, appId: Int): List<File> {
+            val webView = runCatching {
+                ContainerUtils.getContainer(context, "STEAM_$appId").runtime == Container.RUNTIME_WEBVIEW
+            }.getOrDefault(false)
+            return if (webView) html5SaveDirs(context, appId) else getGseSaveDirs(context, appId)
         }
 
         suspend fun storeAchievementUnlocks(

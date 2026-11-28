@@ -84,6 +84,8 @@ data class PendingRung(
     val trialStartedAt: Long? = null,
     /** Trial launches in a row that were never judged and left no sign of a crash. */
     val unjudged: Int = 0,
+    /** Judged trial starts in a row that never showed the game's window. */
+    val noWindowStarts: Int = 0,
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("rung", rung.raw)
@@ -96,6 +98,7 @@ data class PendingRung(
         skippedOps?.let { put("skipped_ops", it) }
         trialStartedAt?.let { put("trial_started_at", it) }
         if (unjudged > 0) put("unjudged", unjudged)
+        if (noWindowStarts > 0) put("no_window_starts", noWindowStarts)
     }
 
     fun toKept(newBaseline: Metrics?): KeptRung = KeptRung(
@@ -127,6 +130,7 @@ data class PendingRung(
                 skippedOps = o.optIntOrNull("skipped_ops"),
                 trialStartedAt = o.optLongOrNull("trial_started_at"),
                 unjudged = o.optInt("unjudged", 0),
+                noWindowStarts = o.optInt("no_window_starts", 0),
             )
         }
     }
@@ -144,6 +148,21 @@ data class TriedRung(val rungId: String, val version: String, val result: String
         fun fromJson(o: JSONObject): TriedRung? {
             val id = o.optStringOrNull("rung_id") ?: return null
             return TriedRung(id, o.optStringOrNull("version").orEmpty(), o.optString("result"), o.optStringOrNull("judge_reason"))
+        }
+    }
+}
+
+data class SkippedRung(val rungId: String, val version: String, val reason: String) {
+    fun toJson(): JSONObject = JSONObject().apply {
+        put("rung_id", rungId)
+        put("version", version)
+        put("reason", reason)
+    }
+
+    companion object {
+        fun fromJson(o: JSONObject): SkippedRung? {
+            val id = o.optStringOrNull("rung_id") ?: return null
+            return SkippedRung(id, o.optStringOrNull("version").orEmpty(), o.optStringOrNull("reason").orEmpty())
         }
     }
 }
@@ -170,11 +189,12 @@ data class ProfileLadder(
     val kept: List<KeptRung> = emptyList(),
     val pending: PendingRung? = null,
     val tried: List<TriedRung> = emptyList(),
-    val bad: List<String> = emptyList(),
     val noChangeStreak: Int = 0,
     /** Metrics of the last session on the current settings when the latest run record no longer reflects them. */
     val baselineOverride: Metrics? = null,
     val lastStatus: String? = null,
+    /** Rungs the server offered that were not applied and never will be; the next request lists them. */
+    val skipped: List<SkippedRung> = emptyList(),
 ) {
     val hasApplied: Boolean get() = pending != null || kept.any { it.applied }
 
@@ -188,10 +208,13 @@ data class ProfileLadder(
         }
         if (kept.any { it.rungId == rung.rungId }) return "already kept"
         if (tried.any { it.rungId == rung.rungId }) return "already tried"
+        if (skipped.any { it.rungId == rung.rungId }) return "already skipped"
+        // A step number is one level of the game's settings ladder whatever the phase: each level is tried once.
         val step = settingsStep(rung.rungId, rung.raw)?.takeUnless { rung.recovery }
         if (step != null) {
             if (kept.any { settingsStep(it.rungId, it.rung) == step }) return "step $step already kept"
             if (tried.any { settingsStep(it.rungId, null) == step }) return "step $step already tried"
+            if (skipped.any { settingsStep(it.rungId, null) == step }) return "step $step already skipped"
         }
         val levers = canonicalJson(rung.raw.optJSONArray("levers"))
         return if (kept.any { k -> k.rung?.let { canonicalJson(it.optJSONArray("levers")) == levers } == true }) "same levers already kept" else null
@@ -202,10 +225,10 @@ data class ProfileLadder(
         put("kept", JSONArray().apply { kept.forEach { put(it.toJson()) } })
         put("pending", pending?.toJson() ?: JSONObject.NULL)
         put("tried", JSONArray().apply { tried.forEach { put(it.toJson()) } })
-        put("bad", JSONArray(bad))
         put("no_change_streak", noChangeStreak)
         put("baseline_override", baselineOverride?.toJson() ?: JSONObject.NULL)
         lastStatus?.let { put("last_status", it) }
+        if (skipped.isNotEmpty()) put("skipped", JSONArray().apply { skipped.forEach { put(it.toJson()) } })
     }
 
     companion object {
@@ -214,10 +237,10 @@ data class ProfileLadder(
             kept = o.optJSONArray("kept").objects().mapNotNull { KeptRung.fromJson(it) },
             pending = PendingRung.fromJson(o.optJSONObject("pending")),
             tried = o.optJSONArray("tried").objects().mapNotNull { TriedRung.fromJson(it) },
-            bad = o.optJSONArray("bad").strings(),
             noChangeStreak = o.optInt("no_change_streak", 0),
             baselineOverride = Metrics.fromJson(o.optJSONObject("baseline_override")),
             lastStatus = o.optStringOrNull("last_status"),
+            skipped = o.optJSONArray("skipped").objects().mapNotNull { SkippedRung.fromJson(it) },
         )
     }
 }
@@ -269,7 +292,6 @@ data class PrefetchedRung(
             this.profile == profile &&
             this.key == key &&
             kept == keptIds(ladder) &&
-            rung.rungId !in ladder.bad &&
             ladder.tried.none { it.rungId == rung.rungId && it.version == rung.version } &&
             !ladder.repeats(rung)
 
@@ -330,6 +352,8 @@ data class OptimizeCard(
     val serverDeltas: JSONObject? = null,
     /** On a first card: the frame rate the server expects the game to hold once tuned. */
     val expectedFps: Int? = null,
+    /** On an after-card: the server's answer for the next step was that it has none, so there is nothing to keep going to. */
+    val nothingNext: Boolean = false,
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("kind", kind)
@@ -347,6 +371,7 @@ data class OptimizeCard(
         if (unverified) put("unverified", true)
         serverDeltas?.let { put("server_deltas", it) }
         expectedFps?.let { put("expected_fps", it) }
+        if (nothingNext) put("nothing_next", true)
     }
 
     /** Equality ignores [serverDeltas]' identity: two cards with the same deltas text are the same card. */
@@ -356,7 +381,7 @@ data class OptimizeCard(
 
     override fun hashCode(): Int = copy(serverDeltas = null).fields().hashCode()
 
-    private fun fields(): List<Any?> = listOf(kind, at, gameName, profile, cls, rungId, outcome, fpsGainPct, stutterDropPct, metrics, capFps, before, unverified, expectedFps)
+    private fun fields(): List<Any?> = listOf(kind, at, gameName, profile, cls, rungId, outcome, fpsGainPct, stutterDropPct, metrics, capFps, before, unverified, expectedFps, nothingNext)
 
     companion object {
         const val FIRST = "first"
@@ -371,9 +396,13 @@ data class OptimizeCard(
         /** The server has no safe change for the game yet; it is checked again later. */
         const val NO_RULE = "no_rule"
 
+        /** The session was too short to judge the step on trial; it stays on, and the card says how long to play. */
+        const val SHORT = "short"
+
         const val OUTCOME_FPS = "fps"
         const val OUTCOME_STUTTER = "stutter"
         const val OUTCOME_STABLE = "stable"
+        const val OUTCOME_COOLER = "cooler"
 
         /** On a worse card: the step crashed the game or kept it from reaching gameplay, and was taken off. */
         const val OUTCOME_CRASH = "crash"
@@ -397,6 +426,7 @@ data class OptimizeCard(
                 unverified = o.optBoolean("unverified", false),
                 serverDeltas = o.optJSONObject("server_deltas"),
                 expectedFps = o.optIntOrNull("expected_fps"),
+                nothingNext = o.optBoolean("nothing_next", false),
             )
         }
     }
@@ -463,6 +493,8 @@ data class OptimizeLocalState(
     val capPreferred: Boolean = false,
     /** No cap question before this time ("Not now"). */
     val capSnoozedUntil: Long = 0L,
+    /** The cap rung the question was last about; once declined, requests list it as skipped while the snooze lasts. */
+    val capQuestionRung: SkippedRung? = null,
     /** The rules build of the newest server answer; a prefetched rung from another build is not used. */
     val lastRulesVersion: String? = null,
     /** The server had nothing for the game; set while it is not asked again. */
@@ -494,6 +526,7 @@ data class OptimizeLocalState(
         prefetched?.let { put("prefetched", it.toJson()) }
         if (capPreferred) put("ladder_prefer", PREFER_CAP)
         if (capSnoozedUntil > 0) put("cap_snoozed_until", capSnoozedUntil)
+        capQuestionRung?.let { put("cap_question_rung", it.toJson()) }
         lastRulesVersion?.let { put("last_rules_version", it) }
         noRule?.let { put("no_rule", it.toJson()) }
         gpuWorkScaling?.let { put("gpu_work_scaling", it) }
@@ -530,6 +563,7 @@ data class OptimizeLocalState(
                 prefetched = PrefetchedRung.fromJson(o.optJSONObject("prefetched")),
                 capPreferred = o.optStringOrNull("ladder_prefer") == PREFER_CAP,
                 capSnoozedUntil = o.optLong("cap_snoozed_until", 0L),
+                capQuestionRung = o.optJSONObject("cap_question_rung")?.let { SkippedRung.fromJson(it) },
                 lastRulesVersion = o.optStringOrNull("last_rules_version"),
                 noRule = NoRuleHold.fromJson(o.optJSONObject("no_rule")),
                 gpuWorkScaling = o.optDoubleOrNull("gpu_work_scaling")?.coerceIn(OptimizeJudge.GPU_WORK_SCALING_MIN, OptimizeJudge.GPU_WORK_SCALING_MAX),
@@ -550,7 +584,6 @@ data class OptimizeLocalState(
                 kept = kept,
                 pending = pending,
                 tried = o.optJSONArray("tried").objects().mapNotNull { TriedRung.fromJson(it) },
-                bad = o.optJSONArray("bad").strings(),
                 baselineOverride = Metrics.fromJson(o.optJSONObject("baseline_override")),
                 lastStatus = lastStatus,
             )

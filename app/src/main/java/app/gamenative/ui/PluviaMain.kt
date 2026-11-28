@@ -1,5 +1,7 @@
 package app.gamenative.ui
 
+import app.gamenative.service.store.StoreLaunchPrep
+import app.gamenative.service.store.StoreGames
 import android.content.Context
 import android.app.Activity
 import android.content.Intent
@@ -78,12 +80,8 @@ import app.gamenative.service.ea.EaLoginGate
 import app.gamenative.service.rockstar.RockstarCloudPreference
 import app.gamenative.service.rockstar.RockstarCloudSavesManager
 import app.gamenative.service.rockstar.RockstarLaunchSupport
-import app.gamenative.service.rockstar.RockstarHelperArchive
-import app.gamenative.service.rockstar.RockstarHelperDeployment
-import app.gamenative.service.rockstar.RockstarConstants
-import app.gamenative.service.rockstar.RockstarLoginGate
-import app.gamenative.service.rockstar.RockstarTitleMetadata
-import app.gamenative.service.rockstar.RockstarRuntime
+import app.gamenative.service.ubisoft.UbisoftCloudPreference
+import app.gamenative.service.ubisoft.UbisoftCloudSavesManager
 import app.gamenative.service.ubisoft.UbisoftExitOutcome
 import app.gamenative.service.ubisoft.UbisoftLaunchSupport
 import app.gamenative.service.ubisoft.UbisoftLoginGate
@@ -100,6 +98,7 @@ import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGService
 import app.gamenative.api.AccountApi
 import app.gamenative.billing.Membership
+import app.gamenative.billing.PlayBilling
 import app.gamenative.api.DebugReportApi
 import app.gamenative.api.SupportApi
 import app.gamenative.ui.component.dialog.AccountSignInDialog
@@ -107,6 +106,8 @@ import app.gamenative.ui.component.dialog.OptimizeCardHost
 import app.gamenative.ui.component.dialog.ContainerConfigDialog
 import app.gamenative.ui.component.dialog.DebugPreRunDialog
 import app.gamenative.ui.component.dialog.DebugReportDialog
+import app.gamenative.ui.component.dialog.DebugReportSignInBenefits
+import app.gamenative.ui.component.dialog.DebugReportSignInHero
 import app.gamenative.ui.component.dialog.debugReportUsesApp
 import app.gamenative.ui.component.dialog.GameFeedbackDialog
 import app.gamenative.ui.component.dialog.LoadingDialog
@@ -172,6 +173,7 @@ import com.winlator.xenvironment.ImageFSLegacyMigrator
 import com.winlator.xenvironment.ImageFs
 import com.winlator.xenvironment.ImageFsInstaller
 import `in`.dragonbra.javasteam.protobufs.steamclient.SteammessagesClientObjects.ECloudPendingRemoteOperation
+import dagger.hilt.android.EntryPointAccessors
 import java.io.File
 import java.security.SecureRandom
 import java.util.Locale
@@ -190,6 +192,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 
 private const val PENDING_LAUNCH_TIMEOUT_MS = 10_000L
+private const val STEAM_APP_INFO_AWAIT_MS = 30_000L
+private const val PENDING_AFTER_SIGN_IN = "user is now logged in"
 private const val SNACKBAR_SHOW_TIMEOUT_MS = 15_000L
 
 /** Live offline flag of the Home entry; starts from its `offline` argument. */
@@ -202,7 +206,7 @@ private var workshopUpdateDeferred: CompletableDeferred<Boolean>? = null
 private var steamUpdateDeferred: CompletableDeferred<Boolean>? = null
 
 /** Valve Windows client tree (build 1788652215, 2026-09-03) + headless steam.exe for Real Steam mode; see extractSteamFiles. */
-const val REAL_STEAM_CLIENT_ARCHIVE = "steamhost-20261029.tzst"
+const val REAL_STEAM_CLIENT_ARCHIVE = "steamhost-20261119.tzst"
 
 /** gbe_fork release-2026_09_27 experimental steamclient + ColdClientLoader, plus StubDRM64; see SteamUtils.replaceSteamclientDll. */
 const val STEAM_EMULATOR_ARCHIVE = "experimental-drm-20261029.tzst"
@@ -266,6 +270,8 @@ private fun resolveGameAppId(context: Context, appId: String): GameResolutionRes
         GameSource.CUSTOM_GAME -> {
             CustomGameScanner.isGameInstalled(gameId)
         }
+
+        else -> StoreGames.isInstalled(gameId)
     }
 
     if (!isInstalled) {
@@ -291,12 +297,8 @@ private fun resolveGameAppId(context: Context, appId: String): GameResolutionRes
 private fun needsDeferLaunch(context: Context, appId: String): Boolean {
     val gameSource = ContainerUtils.extractGameSourceFromContainerId(appId)
     return when (gameSource) {
-        GameSource.STEAM -> {
-            if (SteamService.isLoggedIn) return false
-            // isLoggedIn is network-gated (requires LoggedOnCallback). allow offline launch when
-            // saved creds + local container exist — Steam can reconnect in background.
-            !(SteamUtils.hasStoredCredentials() && ContainerUtils.hasContainer(context, appId))
-        }
+        // with saved creds the launch path waits for the login itself and can fall back to offline
+        GameSource.STEAM -> !SteamService.isLoggedIn && !SteamUtils.hasStoredCredentials()
         GameSource.GOG -> !GOGService.isRunning
         GameSource.EPIC -> !EpicService.isRunning
         GameSource.AMAZON -> !AmazonService.isRunning
@@ -304,20 +306,27 @@ private fun needsDeferLaunch(context: Context, appId: String): Boolean {
     }
 }
 
-/** Show snackbar for a deferred launch based on the game's source. Returns true if shown. */
-private fun showDeferredLaunchSnackbar(context: Context, appId: String): Boolean {
-    val gameSource = ContainerUtils.extractGameSourceFromContainerId(appId)
-    return when {
-        gameSource == GameSource.STEAM && SteamService.isConnected -> {
-            SnackbarManager.show(context.getString(R.string.intent_launch_steam_pending))
-            true
-        }
-        gameSource != GameSource.STEAM -> {
-            SnackbarManager.show(context.getString(R.string.intent_launch_service_pending))
-            true
-        }
-        else -> false
+/** Store name when a deferred launch waits on a sign-in only the user can do, else null. */
+private fun signInNeededFor(context: Context, appId: String): String? =
+    when (ContainerUtils.extractGameSourceFromContainerId(appId)) {
+        GameSource.STEAM -> "Steam".takeIf { !SteamService.isLoggedIn && !SteamUtils.hasStoredCredentials() }
+        GameSource.GOG -> "GOG".takeIf { !GOGService.hasStoredCredentials(context) }
+        GameSource.EPIC -> "Epic Games".takeIf { !EpicService.hasStoredCredentials(context) }
+        GameSource.AMAZON -> "Amazon Games".takeIf { !AmazonService.hasStoredCredentials(context) }
+        else -> null
     }
+
+/** Show snackbar for a deferred launch based on what it waits for. Returns true if shown. */
+private fun showDeferredLaunchSnackbar(context: Context, appId: String): Boolean {
+    val store = signInNeededFor(context, appId)
+    SnackbarManager.show(
+        if (store != null) {
+            context.getString(R.string.intent_launch_sign_in_required, store)
+        } else {
+            context.getString(R.string.intent_launch_service_pending)
+        },
+    )
+    return true
 }
 
 /** Consume pending launch request only if it's a Steam login failure, and show failure snackbar. */
@@ -350,14 +359,20 @@ private fun trackAiDebugOffer(event: String, appId: String, trigger: String) {
                 "game_name" to ContainerUtils.resolveGameName(appId),
                 "game_store" to ContainerUtils.extractGameSourceFromContainerId(appId).name,
                 "trigger" to trigger,
-            ),
+            ) + aiDebugContext(),
         )
     }
 }
 
+private fun aiDebugContext(): Map<String, Any> = mapOf(
+    "install_source" to if (PlayBilling.isPlayInstall()) "play" else "other",
+    "signed_in" to PrefManager.gameNativeSignedIn.value,
+    "plan" to Membership.aiPlan(),
+)
+
 fun trackAiDebug(event: String, properties: Map<String, Any> = emptyMap()) {
     if (PrefManager.usageAnalyticsEnabled) {
-        PostHog.capture(event = event, properties = properties)
+        PostHog.capture(event = event, properties = properties + aiDebugContext())
     }
 }
 
@@ -401,7 +416,8 @@ private fun startDebugRun(
     viewModel.setTestGraphics(false)
     viewModel.setDiagnostics(false)
     viewModel.setDebugRun(true)
-    viewModel.setOffline(isOffline)
+    val offline = isLaunchOffline(isOffline)
+    viewModel.setOffline(offline)
     preLaunchApp(
         context = context,
         appId = appId,
@@ -410,7 +426,7 @@ private fun startDebugRun(
         setLoadingMessage = viewModel::setLoadingDialogMessage,
         setMessageDialogState = setMessageDialogState,
         onSuccess = viewModel::launchApp,
-        isOffline = isOffline,
+        isOffline = offline,
         bootToContainer = false,
     )
 }
@@ -553,6 +569,7 @@ fun PluviaMain(
         val requestedGameId = runCatching { ContainerUtils.extractGameIdFromContainerId(resolvedAppId) }.getOrNull()
         if (SteamService.keepAlive && requestedGameId != null && ActiveGameRegistry.get()?.appId == requestedGameId) {
             Timber.i("[PluviaMain]: Game $resolvedAppId already running; bringing XServer screen forward")
+            viewModel.setLoadingDialogVisible(false)
             if (navController.currentDestination?.route != PluviaScreen.XServer.route) {
                 navController.navigate(PluviaScreen.XServer.route)
             }
@@ -563,17 +580,8 @@ fun PluviaMain(
             viewModel.setBootToContainer(false)
             scope.launch(Dispatchers.IO) {
                 val gameSource = ContainerUtils.extractGameSourceFromContainerId(resolvedAppId)
-                val isOffline = when {
-                    gameSource != GameSource.STEAM -> false
-                    SteamService.isLoggedIn -> false
-                    !NetworkMonitor.hasInternet.value -> true
-                    else -> {
-                        viewModel.setLoadingDialogVisible(true)
-                        viewModel.setLoadingDialogMessage(context.getString(R.string.connecting_to_steam))
-                        viewModel.setLoadingDialogProgress(-1f)
-                        !SteamUtils.awaitSteamLogin()
-                    }
-                }
+                // resolveIntentLaunch already gave Steam its chance to log in
+                val isOffline = isLaunchOffline(gameSource == GameSource.STEAM && !SteamService.isLoggedIn)
                 // sync viewModel — dialog retries + replaceSteamApi read isOffline.value
                 viewModel.setOffline(isOffline)
                 preLaunchApp(
@@ -593,6 +601,53 @@ fun PluviaMain(
         }
     }
 
+    // Steam answers "is it installed" from its service, so a launch with saved creds waits for
+    // the login first; before that a game with no container yet reads as not installed.
+    // afterSignIn: the library is still syncing right after a sign-in, and a launch before the
+    // game's info arrives starts the container with no executable.
+    val resolveIntentLaunch: (appId: String, afterSignIn: Boolean, onInstalled: (finalAppId: String) -> Unit) -> Unit = { appId, afterSignIn, onInstalled ->
+        val resolve = {
+            when (val resolution = resolveGameAppId(context, appId)) {
+                is GameResolutionResult.Success -> onInstalled(resolution.finalAppId)
+
+                is GameResolutionResult.NotFound -> {
+                    val appName = ContainerUtils.resolveGameName(resolution.originalAppId)
+                    Timber.tag("IntentLaunch").w("Game not installed: $appName ($appId)")
+                    viewModel.setLoadingDialogVisible(false)
+                    msgDialogState = MessageDialogState(
+                        visible = true,
+                        type = DialogType.SYNC_FAIL,
+                        title = context.getString(R.string.game_not_installed_title),
+                        message = context.getString(R.string.game_not_installed_message, appName),
+                        dismissBtnText = context.getString(R.string.ok),
+                    )
+                }
+            }
+        }
+        val isSteam = ContainerUtils.extractGameSourceFromContainerId(appId) == GameSource.STEAM
+        val waitForLogin = isSteam && !SteamService.isLoggedIn && NetworkMonitor.hasInternet.value
+        val waitForAppInfo = isSteam && afterSignIn
+        if (waitForLogin || waitForAppInfo) {
+            viewModel.setLoadingDialogVisible(true)
+            viewModel.setLoadingDialogMessage(context.getString(R.string.connecting_to_steam))
+            viewModel.setLoadingDialogProgress(-1f)
+            scope.launch {
+                if (waitForLogin) SteamUtils.awaitSteamLogin()
+                if (waitForAppInfo) {
+                    val gameId = ContainerUtils.extractGameIdFromContainerId(appId)
+                    withTimeoutOrNull(STEAM_APP_INFO_AWAIT_MS) {
+                        while (withContext(Dispatchers.IO) { SteamService.getAppInfoOf(gameId)?.receivedPICS } != true) {
+                            delay(500)
+                        }
+                    }
+                }
+                resolve()
+            }
+        } else {
+            resolve()
+        }
+    }
+
     // process pending launch request from cold start (event bus has no replay)
     LaunchedEffect(Unit) {
         MainActivity.consumePendingLaunchRequest()?.let { launchRequest ->
@@ -606,27 +661,13 @@ fun PluviaMain(
                 shownPendingLaunchSnackbar = showDeferredLaunchSnackbar(context, launchRequest.appId)
                 return@let
             }
-            when (val resolution = resolveGameAppId(context, launchRequest.appId)) {
-                is GameResolutionResult.Success -> {
-                    if (launchRequest.containerConfig != null) {
-                        IntentLaunchManager.applyTemporaryConfigOverride(
-                            context, launchRequest.appId, launchRequest.containerConfig,
-                        )
-                    }
-                    launchIntentApp(resolution.finalAppId, launchRequest.containerConfig != null, launchRequest.execArgs)
-                }
-
-                is GameResolutionResult.NotFound -> {
-                    val appName = ContainerUtils.resolveGameName(resolution.originalAppId)
-                    Timber.w("[PluviaMain]: Game not installed: $appName (${launchRequest.appId})")
-                    msgDialogState = MessageDialogState(
-                        visible = true,
-                        type = DialogType.SYNC_FAIL,
-                        title = context.getString(R.string.game_not_installed_title),
-                        message = context.getString(R.string.game_not_installed_message, appName),
-                        dismissBtnText = context.getString(R.string.ok),
+            resolveIntentLaunch(launchRequest.appId, false) { finalAppId ->
+                if (launchRequest.containerConfig != null) {
+                    IntentLaunchManager.applyTemporaryConfigOverride(
+                        context, launchRequest.appId, launchRequest.containerConfig,
                     )
                 }
+                launchIntentApp(finalAppId, launchRequest.containerConfig != null, launchRequest.execArgs)
             }
         }
     }
@@ -637,10 +678,14 @@ fun PluviaMain(
         if (pendingLaunchGeneration == 0) return@LaunchedEffect
         delay(PENDING_LAUNCH_TIMEOUT_MS)
         MainActivity.peekPendingLaunchRequest()?.let { request ->
+            val waitsOnSignIn = signInNeededFor(context, request.appId) != null
+            // a Steam sign-in takes the user longer than this; the request stays until they finish
+            if (waitsOnSignIn && ContainerUtils.extractGameSourceFromContainerId(request.appId) == GameSource.STEAM) return@let
             if (needsDeferLaunch(context, request.appId)) {
                 Timber.tag("IntentLaunch").w("Pending launch timed out for ${request.appId}")
                 MainActivity.consumePendingLaunchRequest()
-                SnackbarManager.show(context.getString(R.string.intent_launch_service_timeout))
+                // the sign-in snackbar already named the cause
+                if (!waitsOnSignIn) SnackbarManager.show(context.getString(R.string.intent_launch_service_timeout))
             }
         }
     }
@@ -650,34 +695,20 @@ fun PluviaMain(
         MainActivity.consumePendingLaunchRequest()?.let { launchRequest ->
             Timber.tag("IntentLaunch")
                 .i("Processing pending launch for ${launchRequest.appId} ($reason)")
-            when (val resolution = resolveGameAppId(context, launchRequest.appId)) {
-                is GameResolutionResult.NotFound -> {
-                    val appName = ContainerUtils.resolveGameName(resolution.originalAppId)
-                    Timber.tag("IntentLaunch").w("Game not installed: $appName (${launchRequest.appId})")
-                    msgDialogState = MessageDialogState(
-                        visible = true,
-                        type = DialogType.SYNC_FAIL,
-                        title = context.getString(R.string.game_not_installed_title),
-                        message = context.getString(R.string.game_not_installed_message, appName),
-                        dismissBtnText = context.getString(R.string.ok),
+            resolveIntentLaunch(launchRequest.appId, reason == PENDING_AFTER_SIGN_IN) { finalAppId ->
+                if (launchRequest.containerConfig != null) {
+                    IntentLaunchManager.applyTemporaryConfigOverride(
+                        context, launchRequest.appId, launchRequest.containerConfig,
                     )
                 }
-
-                is GameResolutionResult.Success -> {
-                    if (launchRequest.containerConfig != null) {
-                        IntentLaunchManager.applyTemporaryConfigOverride(
-                            context, launchRequest.appId, launchRequest.containerConfig,
-                        )
+                val homeRoute = PluviaScreen.Home.route + "?offline={offline}"
+                if (navController.currentDestination?.route != homeRoute) {
+                    navController.navigate(PluviaScreen.Home.route + "?offline=false") {
+                        popUpTo(navController.graph.startDestinationId) { saveState = false }
                     }
-                    val homeRoute = PluviaScreen.Home.route + "?offline={offline}"
-                    if (navController.currentDestination?.route != homeRoute) {
-                        navController.navigate(PluviaScreen.Home.route + "?offline=false") {
-                            popUpTo(navController.graph.startDestinationId) { saveState = false }
-                        }
-                    }
-                    // finalAppId — track what actually launched (may differ from launchRequest.appId after resolution)
-                    launchIntentApp(resolution.finalAppId, launchRequest.containerConfig != null, launchRequest.execArgs)
                 }
+                // finalAppId — track what actually launched (may differ from launchRequest.appId after resolution)
+                launchIntentApp(finalAppId, launchRequest.containerConfig != null, launchRequest.execArgs)
             }
         }
     }
@@ -686,6 +717,15 @@ fun PluviaMain(
         viewModel.uiEvent.collect { event ->
             when (event) {
                 MainViewModel.MainUiEvent.LaunchApp -> {
+                    // bootToContainer (Open Container) forces wine routing for html5.
+                    if (!state.bootToContainer &&
+                        withContext(Dispatchers.IO) {
+                            app.gamenative.html5.host.Html5Routing.isHtml5App(context, state.launchedAppId)
+                        }
+                    ) {
+                        navController.navigate(PluviaScreen.WebView.route)
+                        return@collect
+                    }
                     navController.navigate(PluviaScreen.XServer.route)
                 }
 
@@ -707,27 +747,12 @@ fun PluviaMain(
                         return@collect
                     }
 
-                    when (val resolution = resolveGameAppId(context, event.appId)) {
-                        is GameResolutionResult.Success -> {
-                            Timber.i("[PluviaMain]: Using appId: ${resolution.finalAppId} (original: ${event.appId}, isSteamInstalled: ${resolution.isSteamInstalled}, isCustomGame: ${resolution.isCustomGame})")
-                            launchIntentApp(
-                                resolution.finalAppId,
-                                IntentLaunchManager.hasTemporaryOverride(resolution.finalAppId),
-                                event.execArgs,
-                            )
-                        }
-
-                        is GameResolutionResult.NotFound -> {
-                            val appName = ContainerUtils.resolveGameName(resolution.originalAppId)
-                            Timber.w("[PluviaMain]: Game not installed: $appName (${event.appId})")
-                            msgDialogState = MessageDialogState(
-                                visible = true,
-                                type = DialogType.SYNC_FAIL,
-                                title = context.getString(R.string.game_not_installed_title),
-                                message = context.getString(R.string.game_not_installed_message, appName),
-                                dismissBtnText = context.getString(R.string.ok),
-                            )
-                        }
+                    resolveIntentLaunch(event.appId, false) { finalAppId ->
+                        launchIntentApp(
+                            finalAppId,
+                            IntentLaunchManager.hasTemporaryOverride(finalAppId),
+                            event.execArgs,
+                        )
                     }
                 }
 
@@ -770,7 +795,7 @@ fun PluviaMain(
                         LoginResult.Success -> {
                             val pending = MainActivity.peekPendingLaunchRequest()
                             if (pending != null && !needsDeferLaunch(context, pending.appId)) {
-                                processPendingLaunch("user is now logged in")
+                                processPendingLaunch(PENDING_AFTER_SIGN_IN)
                             } else if (pending == null && PluviaApp.xEnvironment == null) {
                                 val currentRoute = navController.currentDestination?.route
                                 val targetRoute = viewModel.getPersistedRoute() ?: PluviaScreen.Home.route
@@ -816,7 +841,11 @@ fun PluviaMain(
 
                 MainViewModel.MainUiEvent.ServiceReady -> {
                     val pending = MainActivity.peekPendingLaunchRequest()
-                    if (pending != null && !needsDeferLaunch(context, pending.appId)) {
+                    // a Steam request is released by the logon result, not by a store service starting
+                    // mid sign-in (creds are saved before the logon completes)
+                    if (pending != null && !needsDeferLaunch(context, pending.appId) &&
+                        ContainerUtils.extractGameSourceFromContainerId(pending.appId) != GameSource.STEAM
+                    ) {
                         processPendingLaunch("service now ready")
                     }
                 }
@@ -907,16 +936,18 @@ fun PluviaMain(
                 is MainViewModel.MainUiEvent.ShowAiDebugOffer -> {
                     aiDebugOfferAppId = event.appId
                     aiDebugOfferTrigger = event.trigger
+                    AccountApi.loadSignedInState()
                     trackAiDebugOffer("ai_debug_offer_shown", event.appId, event.trigger)
                     val offerMessage = context.getString(
                         R.string.debug_offer_message,
                         ContainerUtils.resolveGameName(event.appId),
                     )
+                    val trialNote = if (Membership.aiTrialOffered()) " " + context.getString(R.string.debug_trial_note) else ""
                     msgDialogState = MessageDialogState(
                         visible = true,
                         type = DialogType.AI_DEBUG_OFFER,
                         title = context.getString(R.string.debug_offer_title),
-                        message = offerMessage + " " + context.getString(R.string.debug_trial_note),
+                        message = offerMessage + trialNote,
                         confirmBtnText = context.getString(R.string.debug_offer_confirm),
                         dismissBtnText = context.getString(R.string.close),
                     )
@@ -1194,6 +1225,42 @@ fun PluviaMain(
                     context = context,
                     appId = state.launchedAppId,
                     rockstarPreferredSave = SaveLocation.Local,
+                    setLoadingDialogVisible = viewModel::setLoadingDialogVisible,
+                    setLoadingProgress = viewModel::setLoadingDialogProgress,
+                    setLoadingMessage = viewModel::setLoadingDialogMessage,
+                    setMessageDialogState = setMessageDialogState,
+                    onSuccess = viewModel::launchApp,
+                    isOffline = viewModel.isOffline.value,
+                    bootToContainer = state.bootToContainer,
+                )
+                msgDialogState = MessageDialogState(false)
+            }
+            onDismissRequest = {
+                msgDialogState = MessageDialogState(false)
+            }
+        }
+
+        DialogType.UBISOFT_SYNC_CONFLICT -> {
+            onConfirmClick = {
+                preLaunchApp(
+                    context = context,
+                    appId = state.launchedAppId,
+                    ubisoftPreferredSave = SaveLocation.Remote,
+                    setLoadingDialogVisible = viewModel::setLoadingDialogVisible,
+                    setLoadingProgress = viewModel::setLoadingDialogProgress,
+                    setLoadingMessage = viewModel::setLoadingDialogMessage,
+                    setMessageDialogState = setMessageDialogState,
+                    onSuccess = viewModel::launchApp,
+                    isOffline = viewModel.isOffline.value,
+                    bootToContainer = state.bootToContainer,
+                )
+                msgDialogState = MessageDialogState(false)
+            }
+            onDismissClick = {
+                preLaunchApp(
+                    context = context,
+                    appId = state.launchedAppId,
+                    ubisoftPreferredSave = SaveLocation.Local,
                     setLoadingDialogVisible = viewModel::setLoadingDialogVisible,
                     setLoadingProgress = viewModel::setLoadingDialogProgress,
                     setLoadingMessage = viewModel::setLoadingDialogMessage,
@@ -1594,6 +1661,7 @@ fun PluviaMain(
                 icon = msgDialogState.type.icon,
                 title = msgDialogState.title,
                 message = msgDialogState.message,
+                defaultFocus = msgDialogState.type.defaultFocus,
             )
 
             SteamAgreementGate.Prompt()
@@ -1626,6 +1694,23 @@ fun PluviaMain(
                                 openContainerConfigForAppId = null
                             }
                         },
+                        // not probed here: the html5 entry shows only for a container that is already html5.
+                        html5 = app.gamenative.ui.component.dialog.Html5DialogOptions(
+                            appId = appId,
+                            available = false,
+                            onSave = { newConfig, onComplete ->
+                                // the helper shows the rejection snackbar; the caller only decides dialog fate.
+                                scope.launch {
+                                    try {
+                                        if (ContainerUtils.applyToContainerGated(context, appId, newConfig)) {
+                                            openContainerConfigForAppId = null
+                                        }
+                                    } finally {
+                                        onComplete()
+                                    }
+                                }
+                            },
+                        ),
                     )
                 }
             }
@@ -1772,11 +1857,15 @@ fun PluviaMain(
                         is DebugReportApi.SubmitResult.Forbidden -> {
                             debugReportState = debugReportState.copy(visible = false)
                             val reason = result.reason.ifEmpty { "no_subscription" }
-                            debugPaywallReason = reason
                             trackAiDebug(
                                 "ai_debug_report_result",
                                 mapOf("result" to "forbidden", "reason" to reason, "path" to "discord"),
                             )
+                            if (reason == "not_linked" && !PrefManager.discordRelayTokenPresent.value) {
+                                debugPaywallReason = reason
+                            } else {
+                                membershipPlansVisible = true
+                            }
                         }
 
                         is DebugReportApi.SubmitResult.Failure -> {
@@ -1865,6 +1954,12 @@ fun PluviaMain(
                 }
             }
 
+            LaunchedEffect(debugPreRunVisible) {
+                if (!debugPreRunVisible) return@LaunchedEffect
+                if (AccountApi.loadSignedInState() && AccountApi.account.value == null) AccountApi.fetchAccount()
+                SupportApi.checkAvailability()
+            }
+
             DebugPreRunDialog(
                 visible = debugPreRunVisible,
                 runParams = DebugRunParamsHolder.get(debugPreRunAppId),
@@ -1924,6 +2019,7 @@ fun PluviaMain(
                     val usesApp = debugReportUsesApp(
                         appChatEnabled = SupportApi.available.value != false,
                         accountSignedIn = PrefManager.gameNativeSignedIn.value,
+                        hasDiscordToken = discordTokenPresent,
                         useDiscord = debugReportUseDiscord,
                     )
                     if (usesApp) submitDebugReport() else submitViaDiscord()
@@ -1951,6 +2047,8 @@ fun PluviaMain(
 
             AccountSignInDialog(
                 visible = debugAccountPrompt == SUPPORT_PROMPT_SIGN_IN,
+                hero = { DebugReportSignInHero() },
+                benefits = { DebugReportSignInBenefits() },
                 onSignedIn = {
                     debugAccountPrompt = null
                     submitDebugReport()
@@ -2043,6 +2141,7 @@ fun PluviaMain(
                 BootingSplash(
                     visible = state.showBootingSplash,
                     text = state.bootingSplashText,
+                    progress = state.bootingSplashProgress,
                     heroImageUrl = state.bootingSplashHeroImageUrl,
                     bootAd = state.bootAd,
                     onAbort = { viewModel.abortBoot() },
@@ -2079,7 +2178,8 @@ fun PluviaMain(
                     SteamUtils.hasStoredCredentials() ||
                         GOGService.hasStoredCredentials(context) ||
                         EpicService.hasStoredCredentials(context) ||
-                        AmazonService.hasStoredCredentials(context) ->
+                        AmazonService.hasStoredCredentials(context) ||
+                        StoreGames.anySignedIn(context) ->
                         PluviaScreen.Home.route + "?offline=true"
                     else -> PluviaScreen.LoginUser.route
                 }
@@ -2181,7 +2281,8 @@ fun PluviaMain(
                             viewModel.setTestGraphics(false)
                             viewModel.setDiagnostics(false)
                             viewModel.setDebugRun(false)
-                            viewModel.setOffline(isOffline)
+                            val offline = isLaunchOffline(isOffline)
+                            viewModel.setOffline(offline)
                             preLaunchApp(
                                 context = context,
                                 appId = appId,
@@ -2190,7 +2291,7 @@ fun PluviaMain(
                                 setLoadingMessage = viewModel::setLoadingDialogMessage,
                                 setMessageDialogState = { msgDialogState = it },
                                 onSuccess = viewModel::launchApp,
-                                isOffline = isOffline,
+                                isOffline = offline,
                                 bootToContainer = asContainer,
                             )
                         },
@@ -2200,7 +2301,8 @@ fun PluviaMain(
                             viewModel.setTestGraphics(true)
                             viewModel.setDiagnostics(false)
                             viewModel.setDebugRun(false)
-                            viewModel.setOffline(isOffline)
+                            val offline = isLaunchOffline(isOffline)
+                            viewModel.setOffline(offline)
                             preLaunchApp(
                                 context = context,
                                 appId = appId,
@@ -2209,7 +2311,7 @@ fun PluviaMain(
                                 setLoadingMessage = viewModel::setLoadingDialogMessage,
                                 setMessageDialogState = { msgDialogState = it },
                                 onSuccess = viewModel::launchApp,
-                                isOffline = isOffline,
+                                isOffline = offline,
                                 bootToContainer = true,
                             )
                         },
@@ -2220,7 +2322,8 @@ fun PluviaMain(
                             viewModel.setTestGraphics(false)
                             viewModel.setDiagnostics(true)
                             viewModel.setDebugRun(false)
-                            viewModel.setOffline(isOffline)
+                            val offline = isLaunchOffline(isOffline)
+                            viewModel.setOffline(offline)
                             preLaunchApp(
                                 context = context,
                                 appId = appId,
@@ -2229,7 +2332,7 @@ fun PluviaMain(
                                 setLoadingMessage = viewModel::setLoadingDialogMessage,
                                 setMessageDialogState = { msgDialogState = it },
                                 onSuccess = viewModel::launchApp,
-                                isOffline = isOffline,
+                                isOffline = offline,
                                 bootToContainer = false,
                             )
                         },
@@ -2349,6 +2452,48 @@ fun PluviaMain(
                     )
                 }
 
+                /** HTML5 Game Screen  **/
+                composable(route = PluviaScreen.WebView.route) {
+                    app.gamenative.html5.host.WebViewScreen(
+                        appId = state.launchedAppId,
+                        debugRun = state.debugRun,
+                        onDebugRunAborted = { viewModel.setDebugRun(false) },
+                        navigateBack = {
+                            CoroutineScope(Dispatchers.Main).launch {
+                                app.gamenative.runtime.dispatchNavigateBack(
+                                    expectedRoute = PluviaScreen.WebView.route,
+                                    currentRoute = navController.currentBackStackEntry?.destination?.route,
+                                    wasLaunchedViaExternalIntent = MainActivity.wasLaunchedViaExternalIntent,
+                                    finishActivity = { (context as? android.app.Activity)?.finish() },
+                                    popBackStack = { navController.popBackStack() },
+                                    clearExternalIntentFlag = { MainActivity.wasLaunchedViaExternalIntent = false },
+                                )
+                            }
+                        },
+                        exitSession = {
+                            CoroutineScope(Dispatchers.Main).launch {
+                                app.gamenative.runtime.dispatchWebViewSessionExit(
+                                    expectedRoute = PluviaScreen.WebView.route,
+                                    currentRoute = navController.currentBackStackEntry?.destination?.route,
+                                    popBackStack = { navController.popBackStack() },
+                                )
+                            }
+                        },
+                        onExit = { _ ->
+                            // no-op for non-Steam app ids, so safe for custom games.
+                            viewModel.exitSteamApp(
+                                context,
+                                state.launchedAppId,
+                                app.gamenative.runtime.webViewExitCompletion(
+                                    wasLaunchedViaExternalIntent = MainActivity.wasLaunchedViaExternalIntent,
+                                    finishActivity = { (context as? android.app.Activity)?.finish() },
+                                    clearExternalIntentFlag = { MainActivity.wasLaunchedViaExternalIntent = false },
+                                ),
+                            )
+                        },
+                    )
+                }
+
                 /** Settings **/
                 composable(route = PluviaScreen.Settings.route) {
                     SettingsScreen(
@@ -2413,6 +2558,12 @@ fun PluviaMain(
     }
 }
 
+/**
+ * The library's offline flag follows the Steam logon at startup only. A launch also counts as
+ * offline when the device has no internet now.
+ */
+fun isLaunchOffline(isOffline: Boolean): Boolean = isOffline || !NetworkMonitor.hasInternet.value
+
 fun preLaunchApp(
     context: Context,
     appId: String,
@@ -2420,6 +2571,7 @@ fun preLaunchApp(
     preferredSave: SaveLocation = SaveLocation.None,
     eaPreferredSave: SaveLocation = SaveLocation.None,
     rockstarPreferredSave: SaveLocation = SaveLocation.None,
+    ubisoftPreferredSave: SaveLocation = SaveLocation.None,
     useTemporaryOverride: Boolean = false,
     skipCloudSync: Boolean = false,
     setLoadingDialogVisible: (Boolean) -> Unit,
@@ -2436,9 +2588,173 @@ fun preLaunchApp(
     // TODO: add a way to cancel
     // TODO: add fail conditions
 
+    // html5 skips wine prep but still needs cloud sync, or the pre-launch conflict dialog never surfaces.
+    fun preLaunchHtml5() {
+        fun launchHtml5() {
+            Timber.tag("preLaunchApp").i("html5 app $appId — bypassing wine prep")
+            val html5GameId = ContainerUtils.extractGameIdFromContainerId(appId)
+            val html5GameSource = ContainerUtils.extractGameSourceFromContainerId(appId)
+            val html5LocalSavesOnly = ContainerUtils.isLocalSavesOnly(context, appId)
+            val shouldCloudSync = html5GameSource == GameSource.STEAM &&
+                !isOffline &&
+                !skipCloudSync &&
+                !html5LocalSavesOnly &&
+                SteamService.userSteamId != null
+            val shouldGogSync = html5GameSource == GameSource.GOG && !isOffline && !html5LocalSavesOnly
+            val shouldEpicSync = html5GameSource == GameSource.EPIC && !isOffline && !html5LocalSavesOnly
+            if (!shouldCloudSync && !shouldGogSync && !shouldEpicSync) {
+                // same EULA/SSA gate as the wine path; html5 branches off before it.
+                if (html5GameSource == GameSource.STEAM) {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val accepted = SteamAgreementGate.confirm(context, html5GameId, isOffline, setLoadingDialogVisible)
+                        setLoadingDialogVisible(false)
+                        if (accepted) onSuccess(context, appId)
+                    }
+                    return
+                }
+                setLoadingDialogVisible(false)
+                onSuccess(context, appId)
+                return
+            }
+            // store download-sync into the wine prefix, then mirror it into chromium storage. the exit upload
+            // lives in MainViewModel.handleExitCloudSync.
+            fun runHtml5InboundSync(tag: String, forceInbound: Boolean = false, downloadSync: suspend () -> Boolean) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    Timber.tag(tag).i("[Cloud Saves] html5 $tag $appId — pre-launch download sync")
+                    val synced = runCatching { downloadSync() }
+                        .onFailure { Timber.tag(tag).w(it, "[Cloud Saves] download sync failed for $appId") }
+                        .getOrDefault(false)
+                    if (synced) {
+                        runCatching {
+                            val svc = EntryPointAccessors
+                                .fromApplication(
+                                    context.applicationContext,
+                                    ContainerUtils.Html5SaveSyncEntryPoint::class.java,
+                                )
+                                .html5SaveSyncService()
+                            Timber.tag(tag).d("[Cloud Saves] html5 syncInbound for $appId")
+                            svc.syncInbound(appId, force = forceInbound)
+                        }.onFailure { Timber.tag(tag).w(it, "[Cloud Saves] html5 syncInbound failed for $appId — proceeding") }
+                    } else {
+                        // the wine prefix may hold a partial download; importing it would roll saves back. the sync
+                        // timestamp didn't advance, so the exit upload won't overwrite cloud. log only: false also
+                        // means "no cloud saves for this game".
+                        Timber.tag(tag).w("[Cloud Saves] sync returned false for $appId — skipping html5 syncInbound")
+                    }
+                    setLoadingDialogVisible(false)
+                    onSuccess(context, appId)
+                }
+            }
+            if (shouldGogSync) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    // without the conflict flow syncSaves would merge leveldb files one by one.
+                    val gogAction = when (preferredSave) {
+                        SaveLocation.Local -> "forceupload"
+                        SaveLocation.Remote -> "download"
+                        SaveLocation.None -> null
+                    }
+                    if (gogAction == null) {
+                        val conflict = app.gamenative.service.gog.GOGService.detectCloudSaveConflict(
+                            context,
+                            appId,
+                            chromiumProfileSync = true,
+                        )
+                        if (conflict != null) {
+                            setLoadingDialogVisible(false)
+                            setMessageDialogState(
+                                MessageDialogState(
+                                    visible = true,
+                                    type = DialogType.SYNC_CONFLICT,
+                                    title = context.getString(R.string.main_save_conflict_title),
+                                    message = context.getString(
+                                        R.string.main_save_conflict_message,
+                                        Date(conflict.localTimestamp).toString(),
+                                        Date(conflict.remoteTimestamp).toString(),
+                                    ),
+                                    dismissBtnText = context.getString(R.string.main_keep_local),
+                                    confirmBtnText = context.getString(R.string.main_keep_remote),
+                                ),
+                            )
+                            return@launch
+                        }
+                    }
+                    // "keep remote" downloads files stamped with cloud mtimes, which can be older than the
+                    // inbound marker -- force the import or the WebView silently keeps local saves.
+                    runHtml5InboundSync("GOG", forceInbound = gogAction == "download") {
+                        app.gamenative.service.gog.GOGService.syncCloudSaves(
+                            context = context,
+                            appId = appId,
+                            preferredAction = gogAction ?: "none",
+                            chromiumProfileSync = true,
+                        )
+                    }
+                }
+                return
+            }
+            if (shouldEpicSync) {
+                runHtml5InboundSync("Epic") {
+                    app.gamenative.service.epic.EpicCloudSavesManager.syncCloudSaves(
+                        context = context,
+                        appId = html5GameId,
+                        preferredAction = "auto",
+                        chromiumProfileSync = true,
+                    )
+                }
+                return
+            }
+            CoroutineScope(Dispatchers.IO).launch {
+                if (!SteamAgreementGate.confirm(context, html5GameId, isOffline, setLoadingDialogVisible)) {
+                    setLoadingDialogVisible(false)
+                    return@launch
+                }
+                // activate BEFORE cloud sync so the global `xuser` symlink points at THIS container; otherwise
+                // SteamAutoCloud walks the last-launched game's prefix and every download fails.
+                val html5ContainerManager = ContainerManager(context)
+                val html5Container = ContainerUtils.getOrCreateContainer(context, appId)
+                html5ContainerManager.activateContainer(html5Container)
+                val html5PrefixToPath: (String) -> String = { prefix ->
+                    PathType.from(prefix).toAbsPath(html5Container, html5GameId, SteamService.userSteamId!!.accountID)
+                }
+                app.gamenative.html5.host.runHtml5SteamCloudSync(
+                    context = context,
+                    appId = appId,
+                    gameId = html5GameId,
+                    prefixToPath = html5PrefixToPath,
+                    preferredSave = preferredSave,
+                    eaPreferredSave = eaPreferredSave,
+                    rockstarPreferredSave = rockstarPreferredSave,
+                    ignorePendingOperations = ignorePendingOperations,
+                    isOffline = isOffline,
+                    parentScope = this,
+                    setLoadingDialogVisible = setLoadingDialogVisible,
+                    setLoadingProgress = setLoadingProgress,
+                    setLoadingMessage = setLoadingMessage,
+                    setMessageDialogState = setMessageDialogState,
+                    onSuccess = onSuccess,
+                    useTemporaryOverride = useTemporaryOverride,
+                    retryCount = retryCount,
+                    bootToContainer = bootToContainer,
+                )
+            }
+        }
+        // html5 process setup runs here, on first use, never at app start; it shows its own failure snackbar.
+        CoroutineScope(Dispatchers.IO).launch {
+            if (app.gamenative.html5.host.Html5Runtime.ensureInitialized(context)) {
+                launchHtml5()
+            } else {
+                setLoadingDialogVisible(false)
+            }
+        }
+    }
+
     val gameId = ContainerUtils.extractGameIdFromContainerId(appId)
 
     CoroutineScope(Dispatchers.IO).launch {
+        // Open Container forces wine prep so the user can browse the wine save dirs.
+        if (!bootToContainer && app.gamenative.html5.host.Html5Routing.isHtml5App(context, appId)) {
+            preLaunchHtml5()
+            return@launch
+        }
         if (LaunchReadiness.pending) {
             setLoadingDialogVisible(false)
             (context as? Activity)?.let { LaunchReadiness.resolve(it) }
@@ -2540,6 +2856,7 @@ fun preLaunchApp(
                 GameSource.EPIC -> EpicService.getLaunchExecutable(appId)
                 GameSource.CUSTOM_GAME -> CustomGameScanner.getLaunchExecutable(container)
                 GameSource.AMAZON -> AmazonService.getLaunchExecutable(appId)
+                else -> container.executablePath.ifEmpty { StoreGames.executable(gameId).orEmpty() }
             }
             if (effectiveExe.isBlank()) {
                 Timber.tag("preLaunchApp").w("Cannot launch $appId: no executable found (game source: $gameSource)")
@@ -2705,69 +3022,22 @@ fun preLaunchApp(
                 }
                 app.gamenative.service.ea.EaSteamLinkGate.offerSteamLink(context)
             }
-            /*
-             * Rockstar titles sign in through Social Club, and the Windows stub needs the
-             * resulting ScAuthToken on disk before the game starts: it mints the ROS ticket with
-             * CreateTicketScAuthToken2 and exits when the token file is missing. Minting from
-             * Steam ownership instead was tried and refused by the server, so the account sign-in
-             * is required rather than a convenience.
-             */
-            if (gameSource == GameSource.STEAM && (container.isLaunchHeadlessSteam || container.isLaunchBionicSteam) &&
-                RockstarLaunchSupport.isRockstarTitle(File(SteamService.getAppDirPath(gameId)))
-            ) {
-                val rockstarGameDir = File(SteamService.getAppDirPath(gameId))
-                setLoadingMessage(context.getString(R.string.rockstar_preparing))
-                RockstarHelperArchive.downloadAndExtract(context) { setLoadingProgress(it) }
-                val activeTitle = RockstarTitleMetadata.find(rockstarGameDir)?.let { RockstarTitleMetadata.parse(it) }?.titleId
-                    ?.takeIf { it.matches(Regex("[a-z0-9_]{1,127}")) } ?: "launcher"
-                val activationMarker = File(
-                    RockstarHelperArchive.titleDir(rockstarGameDir),
-                    "${RockstarHelperDeployment.DIRECTORY}/${RockstarConstants.ACTIVATION_MARKER}",
+            RockstarLaunchSupport.servedLaunch(context.filesDir, container, gameSource, gameId)?.let { (rockstarGameDir, rockstarStore) ->
+                val failure = RockstarLaunchSupport.prepareLaunch(
+                    context, rockstarGameDir, File(container.rootDir, ".wine/drive_c"), rockstarStore, setLoadingMessage, setLoadingProgress,
                 )
-                val signIn = RockstarLoginGate.ensureSignedIn(context, activeTitle, gameId, activationMarker.isFile)
-                if (signIn.isSuccess && RockstarLoginGate.titleValidated) activationMarker.delete()
-                if (signIn.isFailure && RockstarLaunchSupport.hasUsableToken(File(SteamService.getAppDirPath(gameId)))) {
-                    /* A token is already in place, so carry on rather than block a launch that works. */
-                    Timber.tag("preLaunchApp").w("Rockstar sign-in did not complete; using the token already in the game directory")
-                } else if (signIn.isFailure) {
-                    Timber.tag("preLaunchApp").w(signIn.exceptionOrNull(), "Rockstar sign-in did not complete")
+                if (failure != null) {
                     setLoadingDialogVisible(false)
                     setMessageDialogState(
                         MessageDialogState(
                             visible = true,
                             type = DialogType.SYNC_FAIL,
                             title = context.getString(R.string.rockstar_login_required_title),
-                            message = context.getString(R.string.rockstar_login_failed, signIn.exceptionOrNull()?.message ?: ""),
+                            message = failure,
                             dismissBtnText = context.getString(R.string.ok),
                         ),
                     )
                     return@launch
-                }
-                val prefixDriveC = File(container.rootDir, ".wine/drive_c")
-                if (!RockstarRuntime.isInstalled(prefixDriveC)) {
-                    val installer = RockstarRuntime.installer(rockstarGameDir)
-                    if (installer == null) {
-                        setLoadingDialogVisible(false)
-                        setMessageDialogState(
-                            MessageDialogState(
-                                visible = true,
-                                type = DialogType.SYNC_FAIL,
-                                title = context.getString(R.string.rockstar_login_required_title),
-                                message = context.getString(R.string.rockstar_installer_missing),
-                                dismissBtnText = context.getString(R.string.ok),
-                            ),
-                        )
-                        return@launch
-                    }
-                    setLoadingMessage(context.getString(R.string.rockstar_runtime_installing))
-                    withContext(Dispatchers.IO) { RockstarRuntime.install(context, installer, prefixDriveC) { setLoadingProgress(it) } }
-                }
-                withContext(Dispatchers.IO) { RockstarRuntime.ensureX86(context, RockstarRuntime.installer(rockstarGameDir), prefixDriveC) { setLoadingProgress(it) } }
-                withContext(Dispatchers.IO) {
-                    check(RockstarLaunchSupport.placeToken(context, rockstarGameDir) || RockstarLaunchSupport.hasUsableToken(rockstarGameDir)) {
-                        "Could not place Rockstar sign-in credentials in the game directory"
-                    }
-                    RockstarHelperDeployment.prepare(context.filesDir, rockstarGameDir)
                 }
             }
             // Games that ship a Ubisoft Connect loader run against the stand-in; the helper archive and runtime are launch dependencies.
@@ -2964,6 +3234,51 @@ fun preLaunchApp(
             return@launch
         }
 
+        val storeGame = if (StoreGames.isStore(gameSource)) StoreGames.game(gameId) else null
+        val store = storeGame?.let { StoreGames.adapter(it) }
+        if (storeGame != null && store != null) {
+            setLoadingMessage(context.getString(R.string.store_preparing, store.displayName))
+            setLoadingProgress(-1f)
+            // Save conflicts reuse the store's existing conflict dialog, which relaunches with its preferred save.
+            val ubisoft = gameSource == GameSource.UBISOFT
+            when (val prep = store.prepareLaunch(context, container, storeGame, if (ubisoft) ubisoftPreferredSave else eaPreferredSave)) {
+                is StoreLaunchPrep.Ready -> {
+                    setLoadingDialogVisible(false)
+                    onSuccess(context, appId)
+                }
+                is StoreLaunchPrep.SaveConflict -> {
+                    setLoadingDialogVisible(false)
+                    setMessageDialogState(
+                        MessageDialogState(
+                            visible = true,
+                            type = if (ubisoft) DialogType.UBISOFT_SYNC_CONFLICT else DialogType.EA_SYNC_CONFLICT,
+                            title = context.getString(R.string.main_save_conflict_title),
+                            message = context.getString(
+                                R.string.main_save_conflict_message,
+                                Date(prep.localMillis).toString(),
+                                prep.remoteMillis?.let { Date(it).toString() } ?: context.getString(R.string.container_storage_source_unknown),
+                            ),
+                            dismissBtnText = context.getString(R.string.main_keep_local),
+                            confirmBtnText = context.getString(R.string.main_keep_remote),
+                        ),
+                    )
+                }
+                is StoreLaunchPrep.Failed -> {
+                    setLoadingDialogVisible(false)
+                    setMessageDialogState(
+                        MessageDialogState(
+                            visible = true,
+                            type = DialogType.SYNC_FAIL,
+                            title = context.getString(R.string.store_launch_failed_title, store.displayName),
+                            message = prep.message,
+                            dismissBtnText = context.getString(R.string.ok),
+                        ),
+                    )
+                }
+            }
+            return@launch
+        }
+
         // For Epic Games, sync cloud saves before launch (executable already verified above via EpicService.getLaunchExecutable)
         val isEpicGame = gameSource == GameSource.EPIC
         if (isEpicGame) {
@@ -3002,6 +3317,7 @@ fun preLaunchApp(
             } else {
                 Timber.tag("preLaunchApp").w("Skipping Steam Cloud sync for $appId by user request")
             }
+            runCatching { UbisoftCloudSavesManager.forgetSession(gameId) }
             setLoadingDialogVisible(false)
             onSuccess(context, appId)
             return@launch
@@ -3256,6 +3572,46 @@ fun preLaunchApp(
             runCatching { RockstarCloudSavesManager.forgetSession(File(SteamService.getAppDirPath(gameId))) }
         }
 
+        if (gameSource == GameSource.STEAM && (container.isLaunchHeadlessSteam || container.isLaunchBionicSteam) &&
+            !container.isLocalSavesOnly && !bootToContainer && !isOffline
+        ) {
+            try {
+                if (UbisoftLaunchSupport.isUbisoftTitle(File(SteamService.getAppDirPath(gameId)))) {
+                    val ubisoftPreference = when (ubisoftPreferredSave) {
+                        SaveLocation.Local -> UbisoftCloudPreference.LOCAL
+                        SaveLocation.Remote -> UbisoftCloudPreference.REMOTE
+                        SaveLocation.None -> UbisoftCloudPreference.NONE
+                    }
+                    val ubisoftPull = UbisoftCloudSavesManager.syncBeforeLaunch(context, container, gameId, ubisoftPreference)
+                    if (ubisoftPull is UbisoftCloudSavesManager.PullResult.Conflict) {
+                        Timber.tag("UbisoftCloud").i("Cloud save conflict for $appId, prompting user")
+                        val localDate = Date(ubisoftPull.localMillis).toString()
+                        val remoteDate = ubisoftPull.remoteMillis?.let { Date(it).toString() }
+                            ?: context.getString(R.string.container_storage_source_unknown)
+                        setLoadingDialogVisible(false)
+                        setMessageDialogState(
+                            MessageDialogState(
+                                visible = true,
+                                type = DialogType.UBISOFT_SYNC_CONFLICT,
+                                title = context.getString(R.string.main_save_conflict_title),
+                                message = context.getString(R.string.main_save_conflict_message, localDate, remoteDate),
+                                dismissBtnText = context.getString(R.string.main_keep_local),
+                                confirmBtnText = context.getString(R.string.main_keep_remote),
+                            ),
+                        )
+                        return@launch
+                    }
+                    Timber.tag("UbisoftCloud").i("Cloud save pull for $appId: $ubisoftPull")
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                Timber.tag("UbisoftCloud").w("Cloud save pull failed for $appId: ${e.javaClass.simpleName}")
+            }
+        } else {
+            runCatching { UbisoftCloudSavesManager.forgetSession(gameId) }
+        }
+
         val postSyncInfo = SteamService.beginLaunchApp(
             appId = gameId,
             prefixToPath = prefixToPath,
@@ -3317,6 +3673,7 @@ fun preLaunchApp(
                         preferredSave = preferredSave,
                         eaPreferredSave = eaPreferredSave,
                         rockstarPreferredSave = rockstarPreferredSave,
+                        ubisoftPreferredSave = ubisoftPreferredSave,
                         useTemporaryOverride = useTemporaryOverride,
                         setLoadingDialogVisible = setLoadingDialogVisible,
                         setLoadingProgress = setLoadingProgress,

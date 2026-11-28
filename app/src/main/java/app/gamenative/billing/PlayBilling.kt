@@ -19,6 +19,7 @@ import com.revenuecat.purchases.awaitLogIn
 import com.revenuecat.purchases.awaitLogOut
 import com.revenuecat.purchases.awaitOfferings
 import com.revenuecat.purchases.awaitPurchase
+import com.revenuecat.purchases.awaitSyncPurchases
 import com.revenuecat.purchases.interfaces.UpdatedCustomerInfoListener
 import kotlinx.coroutines.CancellationException
 import timber.log.Timber
@@ -64,10 +65,14 @@ object PlayBilling {
         return (installer == PLAY_STORE_PACKAGE).also { playInstall = it }
     }
 
+    /** The cached answer of [isPlayInstall]; false until it has been read once. */
+    fun isPlayInstall(): Boolean = playInstall == true
+
     fun enabled(context: Context): Boolean =
         !BuildConfig.XR_BUILD && BuildConfig.REVENUECAT_API_KEY.isNotEmpty() && isPlayInstall(context)
 
     fun init(app: Application) {
+        isPlayInstall(app)
         if (!enabled(app)) return
         try {
             Purchases.logLevel = if (BuildConfig.DEBUG) LogLevel.DEBUG else LogLevel.WARN
@@ -139,7 +144,20 @@ object PlayBilling {
             Timber.tag(TAG).w(e, "RevenueCat login failed")
             return
         }
+        if (!hasActivePlan.value) claimDevicePurchases()
         if (hasActivePlan.value) AccountApi.syncPlay()
+    }
+
+    // A purchase made while signed out belongs to an anonymous customer, and logging in to an
+    // account that already exists does not move it over.
+    private suspend fun claimDevicePurchases() {
+        try {
+            onCustomerInfo(Purchases.sharedInstance.awaitSyncPurchases())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.tag(TAG).w(e, "Purchase sync failed")
+        }
     }
 
     suspend fun unlinkAccount() {
